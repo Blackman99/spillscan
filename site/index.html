@@ -68,11 +68,11 @@
         <div class="cell"><div class="label">CONTAM</div><div class="val ok" id="contam">0</div></div>
         <div class="cell"><div class="label">FILES</div><div class="val" id="files">3</div></div>
       </div>
-      <div class="status-bar" id="status">READY</div>
-      <div class="findings-list" id="findings" aria-live="polite"></div>
+      <div class="status-bar" id="status" role="status" aria-live="polite">READY</div>
+      <div class="findings-list" id="findings" aria-label="Survey findings"></div>
       <div class="controls">
-        <button class="survey" id="survey-btn" type="button">SURVEY</button>
-        <button class="ghost" id="reset-btn" type="button">ZERO</button>
+        <button class="survey" id="survey-btn" type="button" title="Shortcut: S">SURVEY</button>
+        <button class="ghost" id="reset-btn" type="button" title="Shortcut: Z">ZERO</button>
       </div>
     </div>
     <p class="lede-under">Tell you, in one command, which secrets already spilled into your local AI coding-agent session transcripts — and scrub them in place with a backup.</p>
@@ -86,23 +86,31 @@
     </article>
     <article class="inst">
       <h2>02 · Install</h2>
-      <pre class="cmd">go install github.com/Blackman99/spillscan/cmd/spillscan@latest
-# or: GitHub Releases → linux / darwin / windows (amd64 + arm64)</pre>
+      <div class="cmd-wrap"><pre class="cmd" id="inst-go">go install github.com/Blackman99/spillscan/cmd/spillscan@latest</pre><button class="copy" type="button" data-copy="inst-go" aria-label="Copy go install command">COPY</button></div>
+      <p>No Go toolchain? Static binary for macOS / Linux:</p>
+      <div class="cmd-wrap"><pre class="cmd" id="inst-bin">V=0.1.0; OS=$(uname -s | tr A-Z a-z); ARCH=$(uname -m | sed 's/x86_64/amd64/;s/aarch64/arm64/')
+curl -fsSL "https://github.com/Blackman99/spillscan/releases/download/v$V/spillscan_${V}_${OS}_${ARCH}.tar.gz" | tar xz spillscan
+sudo mv spillscan /usr/local/bin/ &amp;&amp; spillscan version</pre><button class="copy" type="button" data-copy="inst-bin" aria-label="Copy binary install command">COPY</button></div>
       <p><a href="https://github.com/Blackman99/spillscan/releases">Releases</a> · <a href="docs/">Docs</a> · <a href="docs/install.html">Install guide</a></p>
     </article>
     <article class="inst">
       <h2>03 · One sweep</h2>
       <pre class="cmd">$ spillscan scan
-SPILLSCAN  files=41 findings=3  2026-10-14T02:04:00Z
-RULE          PREVIEW       AGENT         FILE:LINE
-aws-akia      AKIA…MPLE     claude-code   ~/.claude/projects/…/x.jsonl:128
-github-pat    ghp_…a91F     claude-code   ~/.claude/projects/…/x.jsonl:128
-openai-sk     sk-p…9Qx2     codex         ~/.codex/sessions/…/y.jsonl:44
-$ echo $?
-2
+SPILLSCAN  files=41 findings=3 distinct=3  2026-10-14 10:04 CST
+RULE        PREVIEW    AGENT        FILE:LINE
+<span class="hl">aws-akia</span>    AKIA…MPLE  claude-code  ~/.claude/projects/…/x.jsonl:128
+<span class="hl">github-pat</span>  ghp_…a91F  claude-code  ~/.claude/projects/…/x.jsonl:128
+<span class="hl">openai-sk</span>   sk-p…9Qx2  codex        ~/.codex/sessions/…/y.jsonl:44
+
+<span class="hl">CONTAMINATED</span> — 3 distinct secrets in 2 files.
+  1. Rotate them at the provider first — scrubbing a transcript does not revoke a key.
+  2. Preview the scrub:  spillscan redact
+  3. Apply it (.bak kept): spillscan redact --write
 $ spillscan redact --write
 REDACT (write)  files=2 replaced=3
-  bak …/x.jsonl.bak</pre>
+  bak ~/.claude/projects/…/x.jsonl.bak
+  bak ~/.codex/sessions/…/y.jsonl.bak
+<span class="ok">SCRUBBED</span> — 3 secrets replaced with [REDACTED:&lt;rule&gt;]. Verify: spillscan scan</pre>
       <p><img class="demo" src="demo.gif" alt="CLI demo: spillscan scan finds secrets, redact scrubs them" width="720" loading="lazy"></p>
     </article>
     <article class="inst">

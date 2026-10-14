@@ -46,6 +46,27 @@
   const btn = document.getElementById("survey-btn");
   const dialFace = document.getElementById("dial-face");
 
+  let runId = 0; // bumped by ZERO so an in-flight sweep stops instead of fighting the reset
+  function renderHit(h) {
+    const div = document.createElement("div");
+    div.className = "hit";
+    for (const [cls, text] of [["rule", h.rule], ["prev", h.preview], ["", `${h.agent}:${h.line}`]]) {
+      const span = document.createElement("span");
+      if (cls) span.className = cls;
+      span.textContent = text;
+      div.appendChild(span);
+    }
+    list.appendChild(div);
+    list.scrollTop = list.scrollHeight;
+  }
+  function finalStatus(n) {
+    status.textContent = `CONTAMINATION — ${n} secret-shaped hits in 3 sample transcripts. Rotate, then: spillscan redact --write`;
+    status.classList.add("contam");
+    status.classList.remove("done");
+    void status.offsetWidth; // restart the blink
+    status.classList.add("done");
+  }
+
   let angle = -60; // degrees from vertical-up-ish; map 0..100 cps → -90..90
   function setNeedle(deg, spike) {
     angle = deg;
@@ -62,8 +83,8 @@
     contam.className = "val ok";
     filesEl.textContent = "3";
     status.textContent = "READY — press SURVEY to sweep sample transcripts.";
-    status.classList.remove("contam");
-    list.innerHTML = "";
+    status.classList.remove("contam", "done");
+    list.replaceChildren();
     if (dialFace) dialFace.setAttribute("fill", "#8b9a4a");
     setNeedle(-70, false);
   }
@@ -71,10 +92,11 @@
   async function runSurvey() {
     const reduced = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
     const hits = detectAll();
+    const my = ++runId;
     btn.disabled = true;
-    list.innerHTML = "";
+    list.replaceChildren();
     status.textContent = "SURVEYING ~/.claude · ~/.codex · ~/.cursor …";
-    status.classList.remove("contam");
+    status.classList.remove("contam", "done");
     cps.textContent = "—";
     cps.className = "val";
     contam.textContent = "0";
@@ -82,18 +104,12 @@
     if (dialFace) dialFace.setAttribute("fill", "#8b9a4a");
 
     if (reduced) {
-      for (const h of hits) {
-        const div = document.createElement("div");
-        div.className = "hit";
-        div.innerHTML = `<span class="rule">${h.rule}</span><span class="prev">${h.preview}</span><span>${h.agent}:${h.line}</span>`;
-        list.appendChild(div);
-      }
+      for (const h of hits) renderHit(h);
       cps.textContent = String(hits.length * 12);
       cps.className = "val hot";
       contam.textContent = String(hits.length);
       contam.className = "val hot";
-      status.textContent = `CONTAMINATION — ${hits.length} live keys in sample transcripts. Run: spillscan redact --write`;
-      status.classList.add("contam");
+      finalStatus(hits.length);
       if (dialFace) dialFace.setAttribute("fill", "#c45c2a");
       setNeedle(75, true);
       btn.disabled = false;
@@ -107,6 +123,7 @@
       for (let s = 0; s < 8; s++) {
         setNeedle(-70 + Math.random() * 100, false);
         await sleep(40);
+        if (my !== runId) return;
       }
       found++;
       setNeedle(40 + found * 8, true);
@@ -117,15 +134,12 @@
       if (dialFace) dialFace.setAttribute("fill", "#c45c2a");
       status.textContent = `CLICK — ${hits[i].rule} @ ${hits[i].agent}`;
       status.classList.add("contam");
-      const div = document.createElement("div");
-      div.className = "hit";
-      div.innerHTML = `<span class="rule">${hits[i].rule}</span><span class="prev">${hits[i].preview}</span><span>${hits[i].agent}:${hits[i].line}</span>`;
-      list.appendChild(div);
-      list.scrollTop = list.scrollHeight;
+      renderHit(hits[i]);
       await sleep(280);
+      if (my !== runId) return;
       setNeedle(20 + found * 5, false);
     }
-    status.textContent = `CONTAMINATION — ${hits.length} live keys in sample transcripts. Rotate them, then: spillscan redact --write`;
+    finalStatus(hits.length);
     setNeedle(70, false);
     btn.disabled = false;
   }
@@ -134,9 +148,33 @@
 
   btn?.addEventListener("click", runSurvey);
   document.getElementById("reset-btn")?.addEventListener("click", () => {
+    runId++;
     setClean();
     btn.disabled = false;
   });
+
+  // Keyboard: S = survey, Z = zero (ignored while typing or with modifiers).
+  document.addEventListener("keydown", (e) => {
+    if (e.metaKey || e.ctrlKey || e.altKey || /INPUT|TEXTAREA/.test(e.target.tagName)) return;
+    if (e.key === "s" || e.key === "S") { if (!btn.disabled) runSurvey(); }
+    else if (e.key === "z" || e.key === "Z") document.getElementById("reset-btn")?.click();
+  });
+
+  // COPY buttons on install commands.
+  for (const b of document.querySelectorAll("button.copy")) {
+    b.addEventListener("click", async () => {
+      const src = document.getElementById(b.dataset.copy);
+      try {
+        await navigator.clipboard.writeText(src.textContent);
+        b.textContent = "COPIED";
+      } catch {
+        getSelection().selectAllChildren(src);
+        b.textContent = "⌘C";
+      }
+      b.classList.add("done");
+      setTimeout(() => { b.textContent = "COPY"; b.classList.remove("done"); }, 1600);
+    });
+  }
 
   setClean();
   // Auto-start once so strangers see the wow within 5s
