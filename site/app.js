@@ -60,7 +60,10 @@
     list.scrollTop = list.scrollHeight;
   }
   function finalStatus(n) {
-    status.textContent = `CONTAMINATION — ${n} secret-shaped hits in 3 sample transcripts. Rotate, then: spillscan redact --write`;
+    const cmd = document.createElement("span");
+    cmd.className = "nowrap";
+    cmd.textContent = "spillscan redact --write";
+    status.replaceChildren(`CONTAMINATION — ${n} secret-shaped hits in 3 sample transcripts. Rotate, then: `, cmd);
     status.classList.add("contam");
     status.classList.remove("done");
     void status.offsetWidth; // restart the blink

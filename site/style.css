@@ -285,3 +285,4 @@ pre.cmd .ok { color: #8b9a4a; font-weight: 700; }
 @media (prefers-reduced-motion: reduce) {
   .findings-list .hit, .status-bar.done { animation: none; }
 }
+.status-bar .nowrap { white-space: nowrap; }
