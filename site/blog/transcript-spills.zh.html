@@ -1,0 +1,24 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Agent 早就把密钥打进会话记录了——然后呢？</title>
+<meta property="og:image" content="https://blackman99.github.io/spillscan/og.png">
+<link rel="stylesheet" href="../style.css">
+<link rel="icon" href="../favicon.svg" type="image/svg+xml">
+</head>
+<body class="panel-texture">
+<div class="stripe"></div>
+<nav class="top"><a href="../">HOME</a><a href="./">BLOG</a></nav>
+<div class="stack" style="padding-top:3rem">
+<article class="inst">
+<h2>Agent 早就把密钥打进会话记录了——然后呢？</h2>
+<p>2026-10-13，有人在 Claude Code 里跑了一句复合 Bash：<code>echo "searching..."; env 2>/dev/null; npm search foo</code>，大约 10 个真实 token 被写进了 <code>~/.claude/projects/**/*.jsonl</code>。前缀拒绝规则拦不住中间那段；产品侧对 Bash 的 PostToolUse 改写也被忽略。密钥只能去各平台轮换，转录里却还留着副本。</p>
+<p><a href="https://github.com/Blackman99/spillscan">spillscan</a> 是污染巡测仪：一个静态二进制，自动发现 Claude Code / Codex / Cursor 等本地转录根目录，用模式匹配常见云密钥，并能在保持 JSONL 每行合法 JSON 的前提下只改写密钥子串（先写 <code>.bak</code>）。另有一个 PreToolUse <code>guard</code>，在下一次 env 倾倒前直接拒绝。</p>
+<p>它不是网络防火墙。它是有人已经打开药瓶之后，你拿来扫房间的那块表。</p>
+<p>— 2026-10-14</p>
+</article>
+</div>
+</body>
+</html>

@@ -1,0 +1,37 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>spillscan — Configuration</title>
+<meta name="description" content="spillscan Configuration">
+<link rel="icon" href="../favicon.svg" type="image/svg+xml">
+<link rel="canonical" href="https://blackman99.github.io/spillscan/docs/configuration.html">
+<meta property="og:title" content="spillscan — Configuration">
+<meta property="og:image" content="https://blackman99.github.io/spillscan/og.png">
+<meta name="twitter:card" content="summary_large_image">
+<meta name="twitter:image" content="https://blackman99.github.io/spillscan/og.png">
+<link rel="stylesheet" href="../style.css">
+</head>
+<body class="panel-texture">
+<div class="stripe"></div>
+<nav class="top"><a href="../">HOME</a><a href="./">DOCS</a><a href="../blog/">BLOG</a></nav>
+<div class="stack" style="padding-top:3rem">
+<article class="inst">
+<h2>Configuration</h2>
+
+<h3>Claude Code PreToolUse</h3>
+<pre class="cmd">{
+  "hooks": {
+    "PreToolUse": [{
+      "matcher": "Bash",
+      "hooks": [{ "type": "command", "command": "spillscan guard" }]
+    }]
+  }
+}</pre>
+<p>Put this in <code>.claude/settings.json</code> (project) or user settings. The guard splits on <code>&amp;&amp; || ; |</code> and re-scans <code>bash -c</code> / <code>sh -c</code> bodies for <code>env</code>, <code>printenv</code>, <code>cat .env*</code>, <code>/proc/*/environ</code>, <code>kubectl get secret</code>.</p>
+
+</article>
+</div>
+</body>
+</html>

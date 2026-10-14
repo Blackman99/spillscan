@@ -1,0 +1,24 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Your agent already printed the keys — now what?</title>
+<meta property="og:image" content="https://blackman99.github.io/spillscan/og.png">
+<link rel="stylesheet" href="../style.css">
+<link rel="icon" href="../favicon.svg" type="image/svg+xml">
+</head>
+<body class="panel-texture">
+<div class="stripe"></div>
+<nav class="top"><a href="../">HOME</a><a href="./">BLOG</a></nav>
+<div class="stack" style="padding-top:3rem">
+<article class="inst">
+<h2>Your agent already printed the keys — now what?</h2>
+<p>On 2026-10-13 a Claude Code user reported that a compound Bash call — <code>echo "searching..."; env 2>/dev/null; npm search foo</code> — dumped ~10 live tokens into <code>~/.claude/projects/**/*.jsonl</code>. Prefix deny lists miss the middle segment. PostToolUse rewriting for Bash was ignored by the product. The keys had to be rotated; the transcripts still held copies.</p>
+<p><a href="https://github.com/Blackman99/spillscan">spillscan</a> is the contamination survey: one binary discovers Claude Code / Codex / Cursor (and friends) transcript roots, pattern-matches the usual cloud tokens, and can rewrite only the secret substrings while keeping each JSONL line valid JSON — after writing a <code>.bak</code>. A tiny PreToolUse <code>guard</code> denies the env-dump class before the next spill.</p>
+<p>It is not a network firewall. It is the meter you wave over the room after someone already opened the vial.</p>
+<p>— 2026-10-14</p>
+</article>
+</div>
+</body>
+</html>

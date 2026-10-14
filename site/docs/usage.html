@@ -1,0 +1,35 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>spillscan — Usage</title>
+<meta name="description" content="spillscan Usage">
+<link rel="icon" href="../favicon.svg" type="image/svg+xml">
+<link rel="canonical" href="https://blackman99.github.io/spillscan/docs/usage.html">
+<meta property="og:title" content="spillscan — Usage">
+<meta property="og:image" content="https://blackman99.github.io/spillscan/og.png">
+<meta name="twitter:card" content="summary_large_image">
+<meta name="twitter:image" content="https://blackman99.github.io/spillscan/og.png">
+<link rel="stylesheet" href="../style.css">
+</head>
+<body class="panel-texture">
+<div class="stripe"></div>
+<nav class="top"><a href="../">HOME</a><a href="./">DOCS</a><a href="../blog/">BLOG</a></nav>
+<div class="stack" style="padding-top:3rem">
+<article class="inst">
+<h2>Usage</h2>
+
+<pre class="cmd">spillscan paths          # list transcript roots
+spillscan scan           # exit 2 if findings
+spillscan scan --json
+spillscan redact         # dry-run
+spillscan redact --write # .bak then [REDACTED:&lt;rule&gt;]
+spillscan guard          # PreToolUse stdin JSON → decision
+spillscan mcp            # read-only MCP: scan_report, list_paths</pre>
+<p>Pass explicit paths to limit scope: <code>spillscan scan ~/.claude/projects/foo</code></p>
+
+</article>
+</div>
+</body>
+</html>

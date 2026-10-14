@@ -1,0 +1,131 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>spillscan — CONTAMINATION SURVEY</title>
+<meta name="description" content="Tell you, in one command, which secrets already spilled into your local AI coding-agent session transcripts — and scrub them in place with a backup.">
+<link rel="icon" href="favicon.svg" type="image/svg+xml">
+<link rel="canonical" href="https://blackman99.github.io/spillscan/">
+<meta property="og:type" content="website">
+<meta property="og:title" content="spillscan — CONTAMINATION SURVEY">
+<meta property="og:description" content="Find and scrub secrets spilled into Claude Code, Codex, and Cursor session transcripts.">
+<meta property="og:url" content="https://blackman99.github.io/spillscan/">
+<meta property="og:image" content="https://blackman99.github.io/spillscan/og.png">
+<meta property="og:image:width" content="1200">
+<meta property="og:image:height" content="630">
+<meta name="twitter:card" content="summary_large_image">
+<meta name="twitter:title" content="spillscan — CONTAMINATION SURVEY">
+<meta name="twitter:description" content="Find and scrub secrets spilled into Claude Code, Codex, and Cursor session transcripts.">
+<meta name="twitter:image" content="https://blackman99.github.io/spillscan/og.png">
+<link rel="stylesheet" href="style.css">
+</head>
+<body class="panel-texture">
+  <div class="stripe" aria-hidden="true"></div>
+  <nav class="top">
+    <a href="docs/">DOCS</a>
+    <a href="blog/">BLOG</a>
+    <a href="https://github.com/Blackman99/spillscan">SOURCE</a>
+  </nav>
+
+  <section class="hero" aria-label="Contamination survey meter">
+    <div class="meter">
+      <div class="nameplate">
+        <h1>SPILLSCAN — CONTAMINATION SURVEY</h1>
+        <div class="sub">agent transcript · local · offline</div>
+      </div>
+      <div class="dial-wrap">
+        <svg class="dial-svg" viewBox="0 0 320 320" role="img" aria-label="Survey meter dial">
+          <circle cx="160" cy="160" r="148" fill="#2f3a28" stroke="#1a1f16" stroke-width="4"/>
+          <circle cx="160" cy="160" r="130" fill="#5a4030"/>
+          <circle id="dial-face" cx="160" cy="160" r="118" fill="#8b9a4a"/>
+          <circle cx="160" cy="160" r="110" fill="#c4b896"/>
+          <!-- concentric ticks -->
+          <g stroke="#1a1f16" stroke-width="2" stroke-linecap="round">
+            <line x1="160" y1="58" x2="160" y2="72"/>
+            <line x1="220" y1="78" x2="210" y2="90"/>
+            <line x1="248" y1="140" x2="232" y2="144"/>
+            <line x1="248" y1="180" x2="232" y2="176"/>
+            <line x1="220" y1="242" x2="210" y2="230"/>
+            <line x1="160" y1="262" x2="160" y2="248"/>
+            <line x1="100" y1="242" x2="110" y2="230"/>
+            <line x1="72" y1="180" x2="88" y2="176"/>
+            <line x1="72" y1="140" x2="88" y2="144"/>
+            <line x1="100" y1="78" x2="110" y2="90"/>
+          </g>
+          <path d="M70 160 A90 90 0 0 1 250 160" fill="none" stroke="#1a1f16" stroke-width="2" stroke-dasharray="3 8" opacity="0.5"/>
+          <text x="78" y="168" font-family="Teko,sans-serif" font-size="18" fill="#1a1f16">0</text>
+          <text x="150" y="78" font-family="Teko,sans-serif" font-size="18" fill="#1a1f16">50</text>
+          <text x="228" y="168" font-family="Teko,sans-serif" font-size="18" fill="#1a1f16">100</text>
+          <g id="needle" class="needle">
+            <line x1="160" y1="160" x2="160" y2="62" stroke="#e8a020" stroke-width="4" stroke-linecap="round"/>
+            <circle cx="160" cy="160" r="8" fill="#1a1f16"/>
+          </g>
+        </svg>
+      </div>
+      <div class="readout">
+        <div class="cell"><div class="label">CPS</div><div class="val ok" id="cps">0</div></div>
+        <div class="cell"><div class="label">CONTAM</div><div class="val ok" id="contam">0</div></div>
+        <div class="cell"><div class="label">FILES</div><div class="val" id="files">3</div></div>
+      </div>
+      <div class="status-bar" id="status">READY</div>
+      <div class="findings-list" id="findings" aria-live="polite"></div>
+      <div class="controls">
+        <button class="survey" id="survey-btn" type="button">SURVEY</button>
+        <button class="ghost" id="reset-btn" type="button">ZERO</button>
+      </div>
+    </div>
+    <p class="lede-under">Tell you, in one command, which secrets already spilled into your local AI coding-agent session transcripts — and scrub them in place with a backup.</p>
+  </section>
+
+  <div class="stack">
+    <article class="inst">
+      <h2>01 · Why the meter clicks</h2>
+      <p>A bare <code>env</code> / <code>printenv</code> / <code>cat .env</code> inside an agent Bash call writes live credentials into plaintext JSONL under <code>~/.claude/projects</code>, <code>~/.codex/sessions</code>, Cursor, and friends. Prefix deny rules miss <code>echo x; env; npm …</code>. Nothing tells you which sessions still hold which keys — or scrubs them.</p>
+      <p>Source thread: <a href="https://github.com/anthropics/claude-code/issues/80153">anthropics/claude-code#80153</a>.</p>
+    </article>
+    <article class="inst">
+      <h2>02 · Install</h2>
+      <pre class="cmd">go install github.com/Blackman99/spillscan/cmd/spillscan@latest
+# or: GitHub Releases → linux / darwin / windows (amd64 + arm64)</pre>
+      <p><a href="https://github.com/Blackman99/spillscan/releases">Releases</a> · <a href="docs/">Docs</a> · <a href="docs/install.html">Install guide</a></p>
+    </article>
+    <article class="inst">
+      <h2>03 · One sweep</h2>
+      <pre class="cmd">$ spillscan scan
+SPILLSCAN  files=41 findings=3  2026-10-14T02:04:00Z
+RULE          PREVIEW       AGENT         FILE:LINE
+aws-akia      AKIA…MPLE     claude-code   ~/.claude/projects/…/x.jsonl:128
+github-pat    ghp_…a91F     claude-code   ~/.claude/projects/…/x.jsonl:128
+openai-sk     sk-p…9Qx2     codex         ~/.codex/sessions/…/y.jsonl:44
+$ echo $?
+2
+$ spillscan redact --write
+REDACT (write)  files=2 replaced=3
+  bak …/x.jsonl.bak</pre>
+      <p><img class="demo" src="demo.gif" alt="CLI demo: spillscan scan finds secrets, redact scrubs them" width="720" loading="lazy"></p>
+    </article>
+    <article class="inst">
+      <h2>04 · Guard the next dump</h2>
+      <p>Claude Code PreToolUse hook — deny env-dump class Bash even in compound commands:</p>
+      <pre class="cmd"># .claude/settings.json
+{
+  "hooks": {
+    "PreToolUse": [{
+      "matcher": "Bash",
+      "hooks": [{ "type": "command", "command": "spillscan guard" }]
+    }]
+  }
+}</pre>
+    </article>
+    <article class="inst">
+      <h2>05 · Not a firewall — the cleanup</h2>
+      <p><strong>spillscan</strong> = pattern + entropy detection for unknown secrets + JSONL-safe in-place redact. Stroq matches known local values and deliberately does not change past records. gitleaks can scan a directory but is not transcript-aware. Use the meter after the spill; install the guard before the next one.</p>
+    </article>
+  </div>
+  <footer>
+    MIT · <a href="https://github.com/Blackman99/spillscan">Blackman99/spillscan</a> · Geiger contamination survey meter visual language
+  </footer>
+  <script src="app.js"></script>
+</body>
+</html>

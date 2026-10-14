@@ -1,0 +1,6 @@
+/spillscan
+/spillscan.exe
+/dist/
+/bin/
+*.bak
+.DS_Store
