@@ -276,7 +276,9 @@ button.copy.done { background: #8b9a4a; color: #1a1f16; }
 button:focus-visible, a:focus-visible { outline: 3px solid #e8a020; outline-offset: 2px; }
 pre.cmd .hl { color: #c45c2a; font-weight: 700; }
 pre.cmd .ok { color: #8b9a4a; font-weight: 700; }
-.findings-list .hit { animation: hit-in 220ms ease-out; }
+.findings-list .hit { opacity: 1; color: var(--cream); animation: hit-in 220ms ease-out both, click-pulse 0.35s ease; }
+.findings-list .hit > span:last-child { color: var(--phosphor, #8b9a4a); }
+.findings-list .prev { opacity: 1; }
 @keyframes hit-in { from { opacity: 0; transform: translateX(-6px); } to { opacity: 1; transform: none; } }
 .status-bar.done { animation: status-blink 900ms steps(2, start) 2; }
 @keyframes status-blink { 50% { opacity: 0.35; } }
