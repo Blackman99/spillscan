@@ -145,3 +145,6 @@ func commonRoot(files []string) string {
 	}
 	return root
 }
+
+// Agents lists the agent names Discover knows, in display order.
+var Agents = []string{"claude-code", "codex", "cursor", "gemini-cli", "opencode"}

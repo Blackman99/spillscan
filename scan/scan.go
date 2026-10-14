@@ -3,6 +3,7 @@ package scan
 
 import (
 	"bufio"
+	"fmt"
 	"os"
 	"path/filepath"
 	"strings"
@@ -28,6 +29,7 @@ type Finding struct {
 type Result struct {
 	Files     int          `json:"files"`
 	Findings  []Finding    `json:"findings"`
+	Skipped   []string     `json:"skipped,omitempty"` // files that could not be read
 	Roots     []paths.Root `json:"roots,omitempty"`
 	ScannedAt time.Time    `json:"scanned_at"`
 }
@@ -47,6 +49,9 @@ func Run(opt Options) (*Result, error) {
 		for _, p := range opt.Paths {
 			st, err := os.Stat(p)
 			if err != nil {
+				if os.IsNotExist(err) {
+					return nil, fmt.Errorf("path not found: %s", p)
+				}
 				return nil, err
 			}
 			if st.IsDir() {
@@ -75,7 +80,7 @@ func Run(opt Options) (*Result, error) {
 	for _, f := range files {
 		fs, err := scanFile(f)
 		if err != nil {
-			continue
+			res.Skipped = append(res.Skipped, f)
 		}
 		res.Findings = append(res.Findings, fs...)
 	}

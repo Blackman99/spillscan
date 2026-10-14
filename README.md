@@ -6,24 +6,55 @@ One `env` / `printenv` / `cat .env` inside an agent Bash call writes live creden
 
 ![demo](site/demo.gif)
 
-## Install
+## 30-second path
 
 ```bash
 go install github.com/Blackman99/spillscan/cmd/spillscan@latest
-# or grab a release binary (linux / darwin / windows, amd64 + arm64)
+spillscan scan              # survey every agent transcript under $HOME — exit 2 if anything spilled
+spillscan redact            # dry-run: shows what would be scrubbed, changes nothing
+spillscan redact --write    # scrub in place; each file is copied to <file>.bak first
 ```
 
-## Usage
+Rotate any key it finds at the provider **before** scrubbing — redacting a transcript does not revoke a credential.
+
+## Install
+
+**Go 1.24+:** `go install github.com/Blackman99/spillscan/cmd/spillscan@latest`
+
+**No Go (macOS / Linux, static binary):**
 
 ```bash
-spillscan scan
-# RULE            PREVIEW         AGENT         FILE:LINE
-# aws-akia        AKIA…MPLE       claude-code   ~/.claude/projects/…/session.jsonl:3
-echo $?   # 2 if findings, 0 if clean
-
-spillscan redact --write          # writes .bak, replaces with [REDACTED:<rule>]
-spillscan paths                   # discovered roots
+V=0.1.0; OS=$(uname -s | tr A-Z a-z); ARCH=$(uname -m | sed 's/x86_64/amd64/;s/aarch64/arm64/')
+curl -fsSL "https://github.com/Blackman99/spillscan/releases/download/v$V/spillscan_${V}_${OS}_${ARCH}.tar.gz" | tar xz spillscan
+sudo mv spillscan /usr/local/bin/ && spillscan version
 ```
+
+**Windows:** download `spillscan_<version>_windows_amd64.zip` from [Releases](https://github.com/Blackman99/spillscan/releases), verify against `checksums.txt`.
+
+## What a sweep looks like
+
+```text
+$ spillscan scan
+SPILLSCAN  files=41 findings=3 distinct=3  2026-10-14 10:04 CST
+RULE        PREVIEW    AGENT        FILE:LINE
+aws-akia    AKIA…MPLE  claude-code  ~/.claude/projects/…/x.jsonl:128
+github-pat  ghp_…a91F  claude-code  ~/.claude/projects/…/x.jsonl:128
+openai-sk   sk-p…9Qx2  codex        ~/.codex/sessions/…/y.jsonl:44
+
+CONTAMINATED — 3 distinct secrets in 2 files.
+  1. Rotate them at the provider first — scrubbing a transcript does not revoke a key.
+  2. Preview the scrub:  spillscan redact
+  3. Apply it (.bak kept): spillscan redact --write
+```
+
+| Command | What it does |
+|---|---|
+| `spillscan scan [--agent NAME] [paths…]` | Survey. Exit `0` clean · `2` findings · `1` error. `--json` for scripts. |
+| `spillscan redact [--write] [paths…]` | Dry-run by default; `--write` backs up to `.bak`, then replaces with `[REDACTED:<rule>]`. JSONL stays valid JSON. |
+| `spillscan paths` | Which transcript roots were discovered, and how many files each holds. |
+| `spillscan guard` / `spillscan mcp` | Claude Code hook (below) / read-only MCP server (`scan_report`, `list_paths`). |
+
+Agents: `claude-code`, `codex`, `cursor`, `gemini-cli`, `opencode`. Paths are shown as `~/…` so screenshots don't leak your username. Output is colored only on a terminal; `NO_COLOR=1` or `--no-color` turns it off.
 
 ### Guard (Claude Code PreToolUse)
 
