@@ -1,0 +1,26 @@
+<!doctype html><html><head><meta charset="utf-8"><link rel="stylesheet" href="../../site/style.css">
+<style>
+body{width:var(--W);height:var(--H);overflow:hidden;margin:0;padding:46px 56px;position:relative}
+h1{font-size:118px;margin:0 0 0;line-height:.86}
+.pad{position:absolute;left:300px;right:-40px;top:300px;height:420px;transform:rotate(-2.2deg)}
+.log{font-size:22px;line-height:1.8}
+.log li{grid-template-columns:1fr}
+.tagline{position:absolute;right:56px;top:60px;font:600 22px/1.35 var(--body);max-width:15ch;text-align:right}
+.mk{position:absolute;left:56px;bottom:40px;display:flex;gap:12px;align-items:center;font:400 34px/1 var(--disp)}
+</style></head><body>
+<svg width="0" height="0" style="position:absolute"><filter id="wick" x="-30%" y="-30%" width="160%" height="160%"><feTurbulence type="fractalNoise" baseFrequency="0.045" numOctaves="3" seed="7"/><feDisplacementMap in="SourceGraphic" scale="16" xChannelSelector="R" yChannelSelector="G"/></filter></svg>
+<h1>Your agent<br>is <em class="drip">leaking<i></i><i></i><i></i></em>.</h1>
+<p class="tagline">Find &amp; soak up secrets spilled into Claude Code, Codex &amp; Cursor transcripts.</p>
+<div class="pad bled"><div class="stains" id="st"></div>
+<ol class="log">
+<li><span class="txt">AWS_ACCESS_KEY_ID=<span class="leak"><span class="s">AKIAIOSFODNN7EXAMPLE</span></span></span></li>
+<li><span class="txt">GITHUB_TOKEN=<span class="leak soaked"><span class="s">[REDACTED:github-pat]</span></span></span></li>
+<li><span class="txt">OPENAI_API_KEY=<span class="leak"><span class="s">sk-proj-FAKE0000000000demo</span></span></span></li>
+</ol></div>
+<div class="mk"><img src="../../site/logo.svg" width="46" height="46">spillscan</div>
+<script>
+const st=document.getElementById('st');
+document.querySelectorAll('.pad .leak').forEach((l,i)=>{const s=l.querySelector('.s');let x=0,y=0,o=s;while(o&&!o.classList.contains('pad')){x+=o.offsetLeft;y+=o.offsetTop;o=o.offsetParent}
+const w=s.offsetWidth+120,h=150;const soaked=l.classList.contains('soaked');
+st.insertAdjacentHTML('beforeend',`<svg class="${soaked?'soaked':''}" viewBox="0 0 100 100" preserveAspectRatio="none" style="left:${x+s.offsetWidth/2-w/2}px;top:${y-50}px;width:${w}px;height:${h}px;transform:scale(${soaked?.7:1});opacity:1"><path d="M10 45 Q12 18 40 20 Q60 8 82 22 Q98 35 90 55 Q94 80 70 76 Q62 98 55 80 Q30 88 18 70 Q2 62 10 45Z"/><path class="core" d="M25 45 Q30 30 50 32 Q72 30 75 48 Q70 64 50 62 Q28 64 25 45Z"/></svg>`)});
+</script></body></html>

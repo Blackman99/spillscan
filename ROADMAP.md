@@ -4,7 +4,7 @@
 - `spillscan scan` / `redact` / `paths` / `guard` / `version` / `mcp`
 - Detectors: AWS AKIA, GitHub pats, OpenAI/Anthropic sk, Slack, Google API, PEM, JWT-shaped, generic KEY/TOKEN/PASSWORD/SECRET, Stripe sk_live, NPM
 - Claude Code PreToolUse guard for env-dump / cat-.env / printenv / /proc/*/environ (compound commands)
-- GoReleaser binaries; GitHub Pages landing with Geiger meter demo
+- GoReleaser binaries; GitHub Pages landing with Geiger meter demo (redesigned 2026-10-15 as a hazmat absorbent pad)
 
 ## v0.2
 - `spillscan undo` from backup bundle
