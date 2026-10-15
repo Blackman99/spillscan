@@ -1,37 +1,11 @@
-<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 256 256" fill="none">
-  <rect x="28" y="36" width="200" height="184" rx="8" fill="#2f3a28"/>
-  <!-- engraved lines -->
-  <g stroke="#1a1f16" stroke-opacity="0.35" stroke-width="1">
-    <line x1="40" y1="52" x2="216" y2="52"/>
-    <line x1="40" y1="60" x2="216" y2="60"/>
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64" role="img" aria-label="spillscan">
+  <defs><pattern id="d" width="6" height="6" patternUnits="userSpaceOnUse"><circle cx="3" cy="3" r="1.15" fill="#c3c8cf"/></pattern></defs>
+  <g transform="rotate(-9 32 32)">
+    <rect x="9" y="9" width="46" height="46" rx="3" fill="#e3e6ea"/>
+    <rect x="9" y="9" width="46" height="46" rx="3" fill="url(#d)"/>
+    <path d="M15 32h34M32 15v34" stroke="#14130f" stroke-opacity=".18" stroke-width="1.2"/>
+    <circle cx="37" cy="36" r="13" fill="#b79bc6" opacity=".55"/>
   </g>
-  <!-- yellow/black stripe -->
-  <rect x="28" y="36" width="200" height="10" fill="#e8a020"/>
-  <g fill="#1a1f16">
-    <rect x="48" y="36" width="16" height="10"/>
-    <rect x="80" y="36" width="16" height="10"/>
-    <rect x="112" y="36" width="16" height="10"/>
-    <rect x="144" y="36" width="16" height="10"/>
-    <rect x="176" y="36" width="16" height="10"/>
-  </g>
-  <!-- dial -->
-  <circle cx="128" cy="128" r="72" fill="#5a4030"/>
-  <circle cx="128" cy="128" r="64" fill="#c4b896"/>
-  <!-- ticks -->
-  <g stroke="#1a1f16" stroke-width="2" stroke-linecap="round">
-    <line x1="128" y1="72" x2="128" y2="82"/>
-    <line x1="168" y1="88" x2="161" y2="95"/>
-    <line x1="184" y1="128" x2="174" y2="128"/>
-    <line x1="168" y1="168" x2="161" y2="161"/>
-    <line x1="128" y1="184" x2="128" y2="174"/>
-    <line x1="88" y1="168" x2="95" y2="161"/>
-    <line x1="72" y1="128" x2="82" y2="128"/>
-    <line x1="88" y1="88" x2="95" y2="95"/>
-  </g>
-  <!-- custom arc ticks (not trefoil) -->
-  <path d="M80 128 A48 48 0 0 1 176 128" stroke="#8b9a4a" stroke-width="3" fill="none" stroke-dasharray="4 6"/>
-  <!-- needle mid -->
-  <line x1="128" y1="128" x2="170" y2="96" stroke="#e8a020" stroke-width="4" stroke-linecap="round"/>
-  <circle cx="128" cy="128" r="6" fill="#1a1f16"/>
-  <text x="128" y="208" text-anchor="middle" fill="#c4b896" font-family="sans-serif" font-size="14" font-weight="700" letter-spacing="2">SPILLSCAN</text>
+  <path d="M38 8c0 0-9 12-9 18a9 9 0 0 0 18 0c0-6-9-18-9-18z" fill="#e4007c"/>
+  <rect x="25" y="40" width="26" height="6" rx="1" fill="#14130f"/>
 </svg>

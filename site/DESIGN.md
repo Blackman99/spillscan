@@ -1,36 +1,16 @@
-# spillscan design language
+# spillscan design language (v2, 2026-10-15)
 
-**Reference object:** Cold-war hand-held Geiger contamination survey meter — analog needle dial, bakelite handle, yellow/black accent stripe.
+**Reference object:** a hazmat spill-response kit — the grey quilted polypropylene absorbent pad thrown over a leak, the white absorbent sock (boom) that rings a spill, and fluorescent leak-tracer dye on a hazard-yellow spill-kit bin.
 
-**Metaphor:** spilled secrets = contamination in the transcript; scan = survey sweep; redact = decontaminate.
-
-## Axes (registered in `/workspace/oss-factory/design/registry.md`)
+**Concept:** an absorbent pad laid over a real agent transcript; fake secrets bleed fluorescent dye through it, and wiping, tapping or scrolling soaks each one into the pad as `[REDACTED:<rule>]`, which is exactly what `spillscan redact` writes.
 
 | Axis | Choice |
 |---|---|
-| Base | Olive drab instrument panel `#2f3a28` |
-| Palette | `#2f3a28` olive · `#c4b896` dial cream · `#e8a020` needle amber · `#1a1f16` deep olive ink · `#8b9a4a` phosphor green (clean) · `#c45c2a` contamination orange (finding) · `#5a4030` bakelite brown |
-| Fonts | **Teko** 500/600/700 (display/dial) + **Nunito Sans** 400/600 (body) + **JetBrains Mono** 400/500 (commands) |
-| Texture | Fine engraved panel lines + subtle concentric dial ticks (SVG) |
-| Render | Flat instrument SVG + CSS needle rotate |
-| Layout | Full-bleed meter as hero; h1 = nameplate "SPILLSCAN — CONTAMINATION SURVEY"; findings as dial readouts; docs as stacked instrument panels |
-| Animation | Needle sweeps while scanning sample transcript, spikes + visual click on each finding, settles; phosphor green → contamination orange; `prefers-reduced-motion` → final state |
-| Logo | Front view of dial, needle mid-scale, custom tick arc (no ISO radiation trefoil); transparent BG |
-
-## Diff self-check vs every existing project
-
-- vs toolsmoke: not paper/red-ink/typewriter; olive instrument vs warm paper report
-- vs agentckpt: not pharmacy pink / pill box
-- vs certfan: not near-black generative fan; olive + needle dial
-- vs linelore: not white Swiss grid
-- vs runbill: not isometric city / concrete
-- vs actnode: not highway green MUTCD
-- vs drainready: not port fog / containers
-- vs postsleuth: not lilac metro map
-- vs rackhands: not brass vault
-- vs packfence: not navy X-ray CRT (closest "security instrument" — packfence is monitor+scanlines; spillscan is hand-held analog meter, warm olive, needle rotate)
-- vs renewhunt: not Solari flip-board / blue-charcoal
-- vs wheelripe: not orange cheese wedge
-- vs cronlag: not walnut cuckoo clock (closest "dial" — cronlag is wood + polar day rings; spillscan is olive metal panel + single survey needle)
-
-Hex/fonts unused before registration. No SaaS 3-column cards, gradient glow, glassmorphism, left-copy/right-card.
+| Base | Hazard spill-kit yellow `#f2d20c` (saturated, light-mid) |
+| Palette | `#f2d20c` hazard yellow · `#14130f` drum black · `#e3e6ea` pad grey · `#c3c8cf` dimple/quilt grey · `#e4007c` leak-tracer dye (live secret) · `#b79bc6` soaked dye |
+| Fonts | **Bowlby One** (display) + **Instrument Sans** 400/600 (body) + **Sono** 400/600 (transcript, commands), self-hosted |
+| Texture | Polypropylene pad: 12px dimple dot lattice + diagonal quilting + dashed stitched hem; sock boom = knit stitch dashes |
+| Render | Liquid stains: SVG blobs warped by `feTurbulence` + `feDisplacementMap`, `mix-blend-mode: multiply` into the pad weave |
+| Layout | Huge h1 whose "leaking" drips onto a full-bleed, tilted (−1.1°) pad that IS the hero demo; sections separated by a wavy absorbent-sock boom; procedure = Contain / Survey / Rotate / Absorb with outline numerals |
+| Motion | Dye blooms from each token (2.6s expo-out), drips scale down from letters; soak = char-scramble to `[REDACTED:rule]` + stain shrinks and turns lavender; pointer gets a scrap of pad (blotter). `prefers-reduced-motion` shows final bloom, no blotter |
+| Logo | Tilted quilted pad square with a magenta drop and lavender soak halo, black redaction bar; transparent BG |
