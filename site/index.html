@@ -71,7 +71,7 @@
 <section class="proto" aria-labelledby="p">
   <h2 id="p">Spill response, in four moves.</h2>
   <ol class="moves">
-    <li><span class="n">1</span><div><h3>Contain</h3><p>Install the guard so the next <code>echo x; env; npm test</code> is denied before it runs — even inside compound commands that prefix deny rules miss.</p>
+    <li><span class="n">1</span><div><h3>Contain</h3><p>Install the guard so the next <code>echo x; env; npm test</code> is denied before it runs. Current Claude Code deny rules already split compound commands; the guard still covers wrappers and dump shapes a single <code>Bash(env *)</code> can miss — and spillscan cleans secrets already in transcripts.</p>
 <pre class="cmd"># .claude/settings.json
 { "hooks": { "PreToolUse": [{ "matcher": "Bash",
   "hooks": [{ "type": "command", "command": "spillscan guard" }] }] } }</pre></div></li>
