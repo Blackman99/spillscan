@@ -176,7 +176,7 @@ func printScan(out io.Writer, res *scan.Result, p painter, explicit bool) {
 	fmt.Fprintf(out, "%s  %s  %s\n", p.amber(p.bold("SPILLSCAN")), head, p.dim(res.ScannedAt.Local().Format("2006-01-02 15:04 MST")))
 	if res.Files == 0 {
 		if explicit {
-			fmt.Fprintln(out, p.amber("NO READING")+" — no .jsonl transcripts under the given paths.")
+			fmt.Fprintln(out, p.amber("NO READING")+" — no transcripts (*.jsonl, *.jsonl.superseded-*, tool-results/) under the given paths.")
 		} else {
 			fmt.Fprintln(out, p.amber("NO READING")+" — no agent transcripts found under $HOME.")
 			fmt.Fprintln(out, p.dim("  Looked for: "+strings.Join(paths.Agents, ", ")+". Point at a directory: spillscan scan <dir>"))
@@ -241,7 +241,8 @@ func cmdRedact(args []string, out, errw io.Writer) int {
 			fmt.Fprintln(out, "spillscan redact [--write] [--json] [paths...]")
 			fmt.Fprintln(out, "  Without --write: dry-run, nothing is changed.")
 			fmt.Fprintln(out, "  With --write: copy each file to <file>.bak, then replace secrets with [REDACTED:<rule>].")
-			fmt.Fprintln(out, "  JSONL lines stay valid JSON. Rotate keys at the provider first.")
+			fmt.Fprintln(out, "  JSONL lines stay valid JSON; tool-results/ spill files are treated as plain text.")
+			fmt.Fprintln(out, "  Rotate keys at the provider first.")
 			return 0
 		default:
 			if isFlag(a) {
@@ -299,7 +300,7 @@ func cmdRedact(args []string, out, errw io.Writer) int {
 	fmt.Fprintf(out, "%s (%s)  files=%d replaced=%d\n", p.amber(p.bold("REDACT")), mode, res.Files, res.Replaced)
 	switch {
 	case res.Files == 0:
-		fmt.Fprintln(out, p.amber("NO READING")+" — no .jsonl transcripts to scrub.")
+		fmt.Fprintln(out, p.amber("NO READING")+" — no transcripts to scrub.")
 	case res.Replaced == 0:
 		fmt.Fprintln(out, p.ok("CLEAN")+" — nothing to scrub; no files were touched.")
 	case write:

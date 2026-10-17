@@ -91,15 +91,7 @@ func ListFiles(home, agent string) ([]string, error) {
 		if agent != "" && r.Agent != agent {
 			continue
 		}
-		_ = filepath.Walk(r.Path, func(p string, info os.FileInfo, err error) error {
-			if err != nil || info == nil || info.IsDir() {
-				return nil
-			}
-			if strings.HasSuffix(info.Name(), ".jsonl") {
-				all = append(all, p)
-			}
-			return nil
-		})
+		all = append(all, Walk(r.Path)...)
 	}
 	return all, nil
 }
@@ -122,7 +114,8 @@ func expandGlob(pattern string) ([]string, error) {
 		}
 		ok, _ := filepath.Match(suffix, info.Name())
 		if suffix == "*.jsonl" {
-			ok = strings.HasSuffix(info.Name(), ".jsonl")
+			// Transcripts plus Claude Code's set-aside and spilled copies.
+			ok = IsTranscript(p)
 		}
 		if ok {
 			out = append(out, p)

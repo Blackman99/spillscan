@@ -41,7 +41,7 @@ type Options struct {
 	Paths []string // explicit files or dirs; empty = discover
 }
 
-// Run discovers (or uses Paths) and scans JSONL transcripts.
+// Run discovers (or uses Paths) and scans transcripts (see paths.IsTranscript).
 func Run(opt Options) (*Result, error) {
 	res := &Result{ScannedAt: time.Now().UTC(), Findings: []Finding{}}
 	var files []string
@@ -55,12 +55,7 @@ func Run(opt Options) (*Result, error) {
 				return nil, err
 			}
 			if st.IsDir() {
-				_ = filepath.Walk(p, func(fp string, info os.FileInfo, err error) error {
-					if err == nil && info != nil && !info.IsDir() && strings.HasSuffix(info.Name(), ".jsonl") {
-						files = append(files, fp)
-					}
-					return nil
-				})
+				files = append(files, paths.Walk(p)...)
 			} else {
 				files = append(files, p)
 			}
@@ -91,6 +86,9 @@ func scanFile(path string) ([]Finding, error) {
 	st, err := os.Stat(path)
 	if err != nil {
 		return nil, err
+	}
+	if paths.IsBinary(path) {
+		return nil, nil // e.g. an MCP image copy under tool-results/
 	}
 	f, err := os.Open(path)
 	if err != nil {

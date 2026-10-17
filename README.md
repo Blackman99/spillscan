@@ -2,7 +2,7 @@
 
 **Tell you, in one command, which secrets already spilled into your local AI coding-agent session transcripts — and scrub them in place with a backup.**
 
-One `env` / `printenv` / `cat .env` inside an agent Bash call writes live credentials into plaintext session JSONL (`~/.claude/projects/**/*.jsonl`, `~/.codex/sessions/**/*.jsonl`, Cursor, …). spillscan finds them and redacts them.
+One `env` / `printenv` / `cat .env` inside an agent Bash call writes live credentials into plaintext session JSONL (`~/.claude/projects/**/*.jsonl`, `~/.codex/sessions/**/*.jsonl`, Cursor, …). spillscan finds them and redacts them — including the copies Claude Code keeps beside the transcript: large tool outputs spilled to `<session>/tool-results/` and set-aside `*.jsonl.superseded-<timestamp>` transcripts ([docs](https://code.claude.com/docs/en/claude-directory)).
 
 ![demo](site/demo.gif)
 
@@ -50,7 +50,7 @@ CONTAMINATED — 3 distinct secrets in 2 files.
 | Command | What it does |
 |---|---|
 | `spillscan scan [--agent NAME] [paths…]` | Survey. Exit `0` clean · `2` findings · `1` error. `--json` for scripts. |
-| `spillscan redact [--write] [paths…]` | Dry-run by default; `--write` backs up to `.bak`, then replaces with `[REDACTED:<rule>]`. JSONL stays valid JSON. |
+| `spillscan redact [--write] [paths…]` | Dry-run by default; `--write` backs up to `.bak`, then replaces with `[REDACTED:<rule>]`. JSONL stays valid JSON; `tool-results/` spill files are scrubbed as plain text. |
 | `spillscan paths` | Which transcript roots were discovered, and how many files each holds. |
 | `spillscan guard` / `spillscan mcp` | Claude Code hook (below) / read-only MCP server (`scan_report`, `list_paths`). |
 
