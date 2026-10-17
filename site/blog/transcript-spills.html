@@ -14,10 +14,10 @@
 <div class="stack" style="padding-top:3rem">
 <article class="inst">
 <h2>Your agent already printed the keys — now what?</h2>
-<p>On 2026-10-13 a Claude Code user reported that a compound Bash call — <code>echo "searching..."; env 2>/dev/null; npm search foo</code> — dumped ~10 live tokens into <code>~/.claude/projects/**/*.jsonl</code>. Prefix deny lists miss the middle segment. PostToolUse rewriting for Bash was ignored by the product. The keys had to be rotated; the transcripts still held copies.</p>
-<p><a href="https://github.com/Blackman99/spillscan">spillscan</a> is the contamination survey: one binary discovers Claude Code / Codex / Cursor (and friends) transcript roots, pattern-matches the usual cloud tokens, and can rewrite only the secret substrings while keeping each JSONL line valid JSON — after writing a <code>.bak</code>. A tiny PreToolUse <code>guard</code> denies the env-dump class before the next spill.</p>
+<p>In July 2026, <a href="https://github.com/aaronlippold">@aaronlippold</a> reported in <a href="https://github.com/anthropics/claude-code/issues/80153">anthropics/claude-code#80153</a> that a compound Bash call under Claude Code — <code>echo "searching..."; env 2>/dev/null; npm search foo</code> — dumped ~10 live tokens into <code>~/.claude/projects/**/*.jsonl</code>. The report described permission rules as matching a command <em>prefix</em>, so a middle <code>env</code> slipped through; <code>PostToolUse</code> rewriting for Bash was ignored by the product (<a href="https://github.com/anthropics/claude-code/issues/68951">#68951</a>). The keys had to be rotated; the transcripts still held copies.</p>
+<p>Current Claude Code <a href="https://code.claude.com/docs/en/permissions">permissions docs</a> say deny/ask rules split on <code>;</code> / <code>&amp;&amp;</code> / … and fire if <em>any</em> subcommand matches — so <code>Bash(env *)</code> should catch a middle <code>env</code> on current builds. That does not erase secrets already written to disk, and a deny rule still does not cover every spill path (wrappers, <code>bash -c '…'</code>, or a tool that prints a known value). <a href="https://github.com/Blackman99/spillscan">spillscan</a> is the contamination survey: one binary discovers Claude Code / Codex / Cursor (and friends) transcript roots, pattern-matches the usual cloud tokens, and can rewrite only the secret substrings while keeping each JSONL line valid JSON — after writing a <code>.bak</code>. A tiny PreToolUse <code>guard</code> denies the env-dump class before the next spill.</p>
 <p>It is not a network firewall. It is the meter you wave over the room after someone already opened the vial.</p>
-<p>— 2026-10-14</p>
+<p>— 2026-10-14 · updated 2026-10-17</p>
 </article>
 </div>
 </body>

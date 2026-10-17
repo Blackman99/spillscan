@@ -86,7 +86,7 @@ Install into `.claude/settings.json` (project or user). Denies `env` / `printenv
 
 https://blackman99.github.io/spillscan/
 
-Pain source: [anthropics/claude-code#80153](https://github.com/anthropics/claude-code/issues/80153)
+Pain source: [anthropics/claude-code#80153](https://github.com/anthropics/claude-code/issues/80153) (reporter [@aaronlippold](https://github.com/aaronlippold), Jul 2026). Current Claude Code [permissions docs](https://code.claude.com/docs/en/permissions) say deny/ask rules split on `;`/`&&`/… and fire if any subcommand matches — so `Bash(env *)` should catch a middle `env` on current builds. spillscan remains the cleanup for already-spilled transcript secrets (+ PreToolUse guard); PostToolUse Bash rewrite was historically ignored ([#68951](https://github.com/anthropics/claude-code/issues/68951)).
 
 ## License
 

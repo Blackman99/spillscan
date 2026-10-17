@@ -14,10 +14,10 @@
 <div class="stack" style="padding-top:3rem">
 <article class="inst">
 <h2>Agent 早就把密钥打进会话记录了——然后呢？</h2>
-<p>2026-10-13，有人在 Claude Code 里跑了一句复合 Bash：<code>echo "searching..."; env 2>/dev/null; npm search foo</code>，大约 10 个真实 token 被写进了 <code>~/.claude/projects/**/*.jsonl</code>。前缀拒绝规则拦不住中间那段；产品侧对 Bash 的 PostToolUse 改写也被忽略。密钥只能去各平台轮换，转录里却还留着副本。</p>
-<p><a href="https://github.com/Blackman99/spillscan">spillscan</a> 是污染巡测仪：一个静态二进制，自动发现 Claude Code / Codex / Cursor 等本地转录根目录，用模式匹配常见云密钥，并能在保持 JSONL 每行合法 JSON 的前提下只改写密钥子串（先写 <code>.bak</code>）。另有一个 PreToolUse <code>guard</code>，在下一次 env 倾倒前直接拒绝。</p>
+<p>2026 年 7 月，<a href="https://github.com/aaronlippold">@aaronlippold</a> 在 <a href="https://github.com/anthropics/claude-code/issues/80153">anthropics/claude-code#80153</a> 报告：Claude Code 里一句复合 Bash — <code>echo "searching..."; env 2>/dev/null; npm search foo</code> — 把大约 10 个真实 token 写进了 <code>~/.claude/projects/**/*.jsonl</code>。当时该报告称权限规则按命令<em>前缀</em>匹配，中间那段 <code>env</code> 因此漏过；产品侧对 Bash 的 <code>PostToolUse</code> 改写也被忽略（<a href="https://github.com/anthropics/claude-code/issues/68951">#68951</a>）。密钥只能去各平台轮换，转录里却还留着副本。</p>
+<p>现行 Claude Code <a href="https://code.claude.com/docs/en/permissions">权限文档</a>写明：deny/ask 规则会按 <code>;</code> / <code>&amp;&amp;</code> / … 拆分子命令，任一子命令命中即生效 — 因此在当前构建上 <code>Bash(env *)</code> 应当能拦住中间的 <code>env</code>。但这抹不掉已经落盘的密钥，deny 规则也覆盖不了所有泄漏路径（包装命令、<code>bash -c '…'</code>、或工具直接打印已知值）。<a href="https://github.com/Blackman99/spillscan">spillscan</a> 是污染巡测仪：一个静态二进制，自动发现 Claude Code / Codex / Cursor 等本地转录根目录，用模式匹配常见云密钥，并能在保持 JSONL 每行合法 JSON 的前提下只改写密钥子串（先写 <code>.bak</code>）。另有一个 PreToolUse <code>guard</code>，在下一次 env 倾倒前直接拒绝。</p>
 <p>它不是网络防火墙。它是有人已经打开药瓶之后，你拿来扫房间的那块表。</p>
-<p>— 2026-10-14</p>
+<p>— 2026-10-14 · 2026-10-17 更正</p>
 </article>
 </div>
 </body>
