@@ -1,16 +1,14 @@
-// Package redact rewrites secrets inside JSONL transcripts safely.
+// Package redact rewrites secrets inside agent transcripts safely.
 package redact
 
 import (
-	"bufio"
 	"bytes"
 	"encoding/json"
 	"fmt"
 	"os"
-	"path/filepath"
-	"strings"
 
 	"github.com/Blackman99/spillscan/detect"
+	"github.com/Blackman99/spillscan/paths"
 )
 
 // Result describes a redaction pass.
@@ -46,22 +44,45 @@ func Run(files []string, opt Options) (*Result, error) {
 }
 
 func redactFile(path string, write bool) (replaced int, backup string, err error) {
+	if paths.IsBinary(path) {
+		return 0, "", nil // e.g. an MCP image copy under tool-results/
+	}
 	raw, err := os.ReadFile(path)
 	if err != nil {
 		return 0, "", err
 	}
-	sc := bufio.NewScanner(bytes.NewReader(raw))
-	sc.Buffer(make([]byte, 0, 64*1024), 8*1024*1024)
+	// JSONL transcripts get a JSON-aware rewrite per line; anything else
+	// (Claude Code tool-results/ spill files) is plain text. Untouched lines
+	// keep their exact bytes, including CRLF and a missing final newline.
+	jsonl := paths.IsJSONL(path)
 	var out bytes.Buffer
-	for sc.Scan() {
-		line := sc.Text()
-		newLine, n := redactLine(line)
+	out.Grow(len(raw))
+	for _, chunk := range bytes.SplitAfter(raw, []byte("\n")) {
+		if len(chunk) == 0 {
+			continue
+		}
+		body := chunk
+		var eol []byte
+		if bytes.HasSuffix(body, []byte("\n")) {
+			body, eol = body[:len(body)-1], []byte("\n")
+			if bytes.HasSuffix(body, []byte("\r")) {
+				body, eol = body[:len(body)-1], []byte("\r\n")
+			}
+		}
+		var newLine string
+		var n int
+		if jsonl {
+			newLine, n = redactLine(string(body))
+		} else {
+			newLine, n = redactText(string(body))
+		}
 		replaced += n
+		if n == 0 {
+			out.Write(chunk)
+			continue
+		}
 		out.WriteString(newLine)
-		out.WriteByte('\n')
-	}
-	if err := sc.Err(); err != nil {
-		return 0, "", err
+		out.Write(eol)
 	}
 	if !write || replaced == 0 {
 		return replaced, "", nil
@@ -74,6 +95,17 @@ func redactFile(path string, write bool) (replaced int, backup string, err error
 		return 0, bak, err
 	}
 	return replaced, bak, nil
+}
+
+// redactText replaces secrets in a plain-text line in place.
+func redactText(line string) (string, int) {
+	findings := detect.Scan(line)
+	b := []byte(line)
+	for i := len(findings) - 1; i >= 0; i-- {
+		f := findings[i]
+		b = append(b[:f.Start:f.Start], append([]byte("[REDACTED:"+f.Rule+"]"), b[f.End:]...)...)
+	}
+	return string(b), len(findings)
 }
 
 func redactLine(line string) (string, int) {
@@ -133,24 +165,18 @@ func walkReplace(v any, n *int) any {
 	}
 }
 
-// CollectJSONL expands paths to .jsonl files.
-func CollectJSONL(paths []string) ([]string, error) {
+// CollectJSONL expands paths to transcript files: *.jsonl, Claude Code's
+// *.jsonl.superseded-* set-asides and tool-results/ spill files
+// (see paths.IsTranscript). Explicit file paths are kept as given.
+func CollectJSONL(in []string) ([]string, error) {
 	var out []string
-	for _, p := range paths {
+	for _, p := range in {
 		st, err := os.Stat(p)
 		if err != nil {
 			return nil, err
 		}
 		if st.IsDir() {
-			err = filepath.Walk(p, func(fp string, info os.FileInfo, err error) error {
-				if err == nil && info != nil && !info.IsDir() && strings.HasSuffix(info.Name(), ".jsonl") {
-					out = append(out, fp)
-				}
-				return nil
-			})
-			if err != nil {
-				return nil, err
-			}
+			out = append(out, paths.Walk(p)...)
 		} else {
 			out = append(out, p)
 		}

@@ -1,0 +1,3 @@
+Large Bash output spilled by Claude Code (fake fixture).
+GITHUB_TOKEN=ghp_TESTONLYspillscanfixture0000000000001
+PATH=/usr/bin
