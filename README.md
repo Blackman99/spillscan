@@ -25,7 +25,7 @@ Rotate any key it finds at the provider **before** scrubbing — redacting a tra
 **No Go (macOS / Linux, static binary):**
 
 ```bash
-V=0.1.0; OS=$(uname -s | tr A-Z a-z); ARCH=$(uname -m | sed 's/x86_64/amd64/;s/aarch64/arm64/')
+V=0.2.0; OS=$(uname -s | tr A-Z a-z); ARCH=$(uname -m | sed 's/x86_64/amd64/;s/aarch64/arm64/')
 curl -fsSL "https://github.com/Blackman99/spillscan/releases/download/v$V/spillscan_${V}_${OS}_${ARCH}.tar.gz" | tar xz spillscan
 sudo mv spillscan /usr/local/bin/ && spillscan version
 ```
