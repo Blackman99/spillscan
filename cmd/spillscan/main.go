@@ -63,6 +63,7 @@ func run(args []string, out, errw io.Writer) int {
 		}
 		return 0
 	case "mcp":
+		mcp.Version = version
 		if err := mcp.Run(os.Stdin, out); err != nil {
 			fmt.Fprintln(errw, "spillscan mcp:", err)
 			return 1

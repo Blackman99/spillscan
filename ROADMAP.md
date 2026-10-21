@@ -6,12 +6,14 @@
 - Claude Code PreToolUse guard for env-dump / cat-.env / printenv / /proc/*/environ (compound commands)
 - GoReleaser binaries; GitHub Pages landing with Geiger meter demo (redesigned 2026-10-15 as a hazmat absorbent pad)
 
-## v0.2
-- `spillscan undo`: restore `.bak` originals, keeping lines appended after the scrub; repeat `redact --write` never overwrites the first backup (done on main, unreleased)
+## v0.2.0 (shipped)
+- `spillscan undo`: restore `.bak` originals, keeping lines appended after the scrub; repeat `redact --write` never overwrites the first backup
+- scan/redact cover Claude Code `tool-results/` spill files and `*.jsonl.superseded-*` transcripts
+
+## v0.3 candidates
 - More agent roots as paths stabilize (Copilot CLI, Desktop variants)
 - Entropy tuning / false-positive allowlist file
 
-## v0.3
 - Provider "rotate here" links in report
 - Optional PostToolUse companion (when vendors stop ignoring Bash output hooks)
 
