@@ -1,0 +1,41 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>能撤销、又不丢会话的清洗</title>
+<meta name="description" content="spillscan undo 恢复 .bak 原文，同时保留清洗后 agent 追加的内容。">
+<meta property="og:title" content="能撤销、又不丢会话的清洗">
+<meta property="og:image" content="https://blackman99.github.io/spillscan/og.png">
+<meta name="twitter:card" content="summary_large_image">
+<link rel="stylesheet" href="../style.css">
+<link rel="icon" href="../favicon.svg" type="image/svg+xml">
+</head>
+<body class="panel-texture">
+<div class="stripe"></div>
+<nav class="top"><a href="../">HOME</a><a href="../docs/">DOCS</a><a href="./">BLOG</a></nav>
+<div class="stack" style="padding-top:3rem">
+<article class="inst">
+<h2>能撤销、又不丢会话的清洗</h2>
+<p>一个没法撤销的清洗，人在按回车之前总会犹豫。所以 spillscan 加了 <code>spillscan undo</code>。难点不在于把 <code>.bak</code> 拷回去，而在于 agent 的会话记录会一直增长：你继续干活时，Claude Code 和 Codex 会往同一个 session JSONL 里追加内容。</p>
+<p>天真的撤销会直接用备份覆盖文件，悄悄删掉清洗之后写进来的一切。spillscan 更严格：对每个 <code>&lt;file&gt;.bak</code>，它对备份重新跑一遍同样的确定性清洗，然后检查当前文件是否仍然<em>以这些字节开头</em>。于是只有三种情况：</p>
+<ul>
+<li><code>intact</code>：清洗后没变过，原文逐字节恢复，CRLF 和末尾缺失的换行都保持原样。</li>
+<li><code>appended</code>：agent 还在写。原文恢复，新追加的行原封不动接在后面。</li>
+<li><code>diverged</code>：文件被别的方式改过。spillscan 不动它，也保留它的 <code>.bak</code>，提示你手动对比，并以退出码 1 结束。</li>
+</ul>
+<pre class="cmd">$ spillscan undo
+UNDO (dry-run)  backups=2 restorable=1
+STATE     FILE                             NOTE
+appended  ~/.claude/projects/…/a.jsonl     keeps 1 line the agent wrote after the scrub
+diverged  ~/.claude/projects/…/b.jsonl     edited since the scrub; compare with …/b.jsonl.bak by hand
+Would restore 1 transcript, secrets included. Nothing changed. Apply with: spillscan undo --write</pre>
+<p>和 <code>redact</code> 一样，不加 <code>--write</code> 就只是预演。恢复时先写临时文件再 rename，原文落盘之后才删除 <code>.bak</code>。</p>
+<p>做这个功能时还顺手揪出一个更隐蔽的 bug：先跑一次 <code>redact --write</code>，之后 agent 又在同一个会话里打印了一个新密钥，你再清洗一次，第二次会用已经清洗过的文件覆盖 <code>.bak</code>，第一次的原文就没了。现在重复清洗只会把新增的尾部追加进已有备份；如果那里放着一个不是 spillscan 写的 <code>.bak</code>，它会直接拒绝并说明原因。</p>
+<p>有一点没变：undo 会把明文密钥放回磁盘。无论撤不撤销，都请先去服务商那边轮换密钥。</p>
+<p>该功能已在 <code>main</code> 上，会随下一个版本发布。<a href="https://github.com/Blackman99/spillscan">源码与 README</a>。</p>
+<p>— 2026-10-21</p>
+</article>
+</div>
+</body>
+</html>

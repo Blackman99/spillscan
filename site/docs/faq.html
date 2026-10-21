@@ -21,6 +21,7 @@
 <h2>Faq</h2>
 
 <p><strong>Will this rotate my keys?</strong> No. It reports and can redact local transcripts. You still rotate at the provider.</p>
+<p><strong>Can I take a scrub back?</strong> Yes: <code>spillscan undo</code> previews it and <code>spillscan undo --write</code> puts the <code>.bak</code> originals back, keeping any lines the agent wrote after the scrub. A file edited in any other way is left alone.</p>
 <p><strong>Does MCP redact?</strong> No. MCP exposes read-only <code>scan_report</code> and <code>list_paths</code>.</p>
 <p><strong>False positives?</strong> Generic KEY= assignments require high entropy. Open an issue with a fake fixture.</p>
 <p><strong>vs Stroq?</strong> Stroq is a firewall over known local values; spillscan is the cleanup meter for pattern-matched spills already on disk.</p>

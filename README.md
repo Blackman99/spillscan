@@ -13,6 +13,7 @@ go install github.com/Blackman99/spillscan/cmd/spillscan@latest
 spillscan scan              # survey every agent transcript under $HOME — exit 2 if anything spilled
 spillscan redact            # dry-run: shows what would be scrubbed, changes nothing
 spillscan redact --write    # scrub in place; each file is copied to <file>.bak first
+spillscan undo              # changed your mind? dry-run of putting the originals back (then --write)
 ```
 
 Rotate any key it finds at the provider **before** scrubbing — redacting a transcript does not revoke a credential.
@@ -50,7 +51,8 @@ CONTAMINATED — 3 distinct secrets in 2 files.
 | Command | What it does |
 |---|---|
 | `spillscan scan [--agent NAME] [paths…]` | Survey. Exit `0` clean · `2` findings · `1` error. `--json` for scripts. |
-| `spillscan redact [--write] [paths…]` | Dry-run by default; `--write` backs up to `.bak`, then replaces with `[REDACTED:<rule>]`. JSONL stays valid JSON; `tool-results/` spill files are scrubbed as plain text. |
+| `spillscan redact [--write] [paths…]` | Dry-run by default; `--write` backs up to `.bak`, then replaces with `[REDACTED:<rule>]`. JSONL stays valid JSON; `tool-results/` spill files are scrubbed as plain text. Scrubbing again later extends the existing `.bak` with the new lines instead of overwriting the first originals. |
+| `spillscan undo [--write] [paths…]` | Put the `.bak` originals back. Dry-run by default. Lines the agent appended after the scrub are kept; a file edited any other way is reported `diverged` and left alone. Exit `1` if any backup could not be restored. *(on `main`, ships in the next release)* |
 | `spillscan paths` | Which transcript roots were discovered, and how many files each holds. |
 | `spillscan guard` / `spillscan mcp` | Claude Code hook (below) / read-only MCP server (`scan_report`, `list_paths`). |
 

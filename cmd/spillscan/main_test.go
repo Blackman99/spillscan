@@ -101,3 +101,33 @@ func TestSuggestAndTildify(t *testing.T) {
 		t.Errorf("tildify=%q", got)
 	}
 }
+
+func TestUndoCLI(t *testing.T) {
+	dir := t.TempDir()
+	src, _ := os.ReadFile("../../testdata/codex/session.jsonl")
+	f := filepath.Join(dir, "s.jsonl")
+	_ = os.WriteFile(f, src, 0o600)
+	code, out, _ := runCLI(t, "undo", dir)
+	if code != 0 || !strings.Contains(out, "no spillscan .bak backups") {
+		t.Fatalf("empty: exit=%d %s", code, out)
+	}
+	_, out, _ = runCLI(t, "redact", "--write", f)
+	if !strings.Contains(out, "spillscan undo") {
+		t.Fatalf("redact --write should mention undo: %s", out)
+	}
+	code, out, _ = runCLI(t, "undo", dir)
+	if code != 0 || !strings.Contains(out, "Would restore 1 transcript") || !strings.Contains(out, "undo --write "+dir) {
+		t.Fatalf("dry-run: exit=%d %s", code, out)
+	}
+	code, out, _ = runCLI(t, "undo", "--write", dir)
+	if code != 0 || !strings.Contains(out, "RESTORED") {
+		t.Fatalf("write: exit=%d %s", code, out)
+	}
+	if got, _ := os.ReadFile(f); !bytes.Equal(got, src) {
+		t.Fatal("undo did not restore original bytes")
+	}
+	code, _, errOut := runCLI(t, "undo", "--wirte")
+	if code != 1 || !strings.Contains(errOut, "did you mean: --write") {
+		t.Fatalf("flag typo: %d %s", code, errOut)
+	}
+}

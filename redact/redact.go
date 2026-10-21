@@ -51,12 +51,53 @@ func redactFile(path string, write bool) (replaced int, backup string, err error
 	if err != nil {
 		return 0, "", err
 	}
-	// JSONL transcripts get a JSON-aware rewrite per line; anything else
-	// (Claude Code tool-results/ spill files) is plain text. Untouched lines
-	// keep their exact bytes, including CRLF and a missing final newline.
-	jsonl := paths.IsJSONL(path)
+	out, replaced := Scrub(raw, paths.IsJSONL(path))
+	if !write || replaced == 0 {
+		return replaced, "", nil
+	}
+	bak := path + ".bak"
+	orig, err := backupContent(path, bak, raw)
+	if err != nil {
+		return 0, "", err
+	}
+	if err := os.WriteFile(bak, orig, 0o600); err != nil {
+		return 0, "", fmt.Errorf("backup: %w", err)
+	}
+	if err := os.WriteFile(path, out, 0o600); err != nil {
+		return 0, bak, err
+	}
+	return replaced, bak, nil
+}
+
+// backupContent returns what <file>.bak should hold before a scrub. On a
+// first scrub that is simply the current bytes. When an earlier scrub left a
+// .bak and the agent has since appended to the transcript, the old backup is
+// extended with the new tail so it keeps holding every original byte — a
+// second `redact --write` must never overwrite the first originals.
+func backupContent(path, bak string, raw []byte) ([]byte, error) {
+	old, err := os.ReadFile(bak)
+	if os.IsNotExist(err) {
+		return raw, nil
+	}
+	if err != nil {
+		return nil, fmt.Errorf("backup: %w", err)
+	}
+	scrubbed, _ := Scrub(old, paths.IsJSONL(path))
+	if !bytes.HasPrefix(raw, scrubbed) {
+		return nil, fmt.Errorf("%s already exists and does not match %s; move it aside (it may hold originals) and retry", bak, path)
+	}
+	return append(old, raw[len(scrubbed):]...), nil
+}
+
+// Scrub returns raw with every detected secret replaced by
+// [REDACTED:<rule>] and the number of replacements. jsonl selects the
+// JSON-aware per-line rewrite; anything else (Claude Code tool-results/ spill
+// files) is plain text. Untouched lines keep their exact bytes, including
+// CRLF and a missing final newline.
+func Scrub(raw []byte, jsonl bool) ([]byte, int) {
 	var out bytes.Buffer
 	out.Grow(len(raw))
+	replaced := 0
 	for _, chunk := range bytes.SplitAfter(raw, []byte("\n")) {
 		if len(chunk) == 0 {
 			continue
@@ -84,17 +125,7 @@ func redactFile(path string, write bool) (replaced int, backup string, err error
 		out.WriteString(newLine)
 		out.Write(eol)
 	}
-	if !write || replaced == 0 {
-		return replaced, "", nil
-	}
-	bak := path + ".bak"
-	if err := os.WriteFile(bak, raw, 0o600); err != nil {
-		return 0, "", fmt.Errorf("backup: %w", err)
-	}
-	if err := os.WriteFile(path, out.Bytes(), 0o600); err != nil {
-		return 0, bak, err
-	}
-	return replaced, bak, nil
+	return out.Bytes(), replaced
 }
 
 // redactText replaces secrets in a plain-text line in place.
