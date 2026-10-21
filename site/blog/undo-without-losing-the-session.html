@@ -1,0 +1,41 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>A scrub you can take back without losing the session</title>
+<meta name="description" content="spillscan undo restores .bak originals while keeping lines the agent appended after the scrub.">
+<meta property="og:title" content="A scrub you can take back without losing the session">
+<meta property="og:image" content="https://blackman99.github.io/spillscan/og.png">
+<meta name="twitter:card" content="summary_large_image">
+<link rel="stylesheet" href="../style.css">
+<link rel="icon" href="../favicon.svg" type="image/svg+xml">
+</head>
+<body class="panel-texture">
+<div class="stripe"></div>
+<nav class="top"><a href="../">HOME</a><a href="../docs/">DOCS</a><a href="./">BLOG</a></nav>
+<div class="stack" style="padding-top:3rem">
+<article class="inst">
+<h2>A scrub you can take back without losing the session</h2>
+<p>A scrub that cannot be taken back makes people hesitate before running it. So spillscan now has <code>spillscan undo</code>. The hard part was not copying a <code>.bak</code> over a file. The hard part is that agent transcripts keep growing: Claude Code and Codex append to the same session JSONL while you keep working.</p>
+<p>A naive undo would copy the backup over the transcript and quietly delete everything written since the scrub. spillscan does something stricter. For each <code>&lt;file&gt;.bak</code> it re-runs the same deterministic scrub on the backup and checks that the current file still <em>begins</em> with exactly those bytes. Then there are three cases:</p>
+<ul>
+<li><code>intact</code>: nothing changed since the scrub, so the original comes back byte for byte, CRLF and missing final newline included.</li>
+<li><code>appended</code>: the agent kept writing. The original comes back and the new lines stay after it, untouched.</li>
+<li><code>diverged</code>: the file was edited some other way. spillscan leaves it and its <code>.bak</code> alone, tells you to compare by hand, and exits 1.</li>
+</ul>
+<pre class="cmd">$ spillscan undo
+UNDO (dry-run)  backups=2 restorable=1
+STATE     FILE                             NOTE
+appended  ~/.claude/projects/…/a.jsonl     keeps 1 line the agent wrote after the scrub
+diverged  ~/.claude/projects/…/b.jsonl     edited since the scrub; compare with …/b.jsonl.bak by hand
+Would restore 1 transcript, secrets included. Nothing changed. Apply with: spillscan undo --write</pre>
+<p>Like <code>redact</code>, it is a dry-run until you pass <code>--write</code>. A restore goes through a temp file and a rename, and the <code>.bak</code> is removed only once the original is back in place.</p>
+<p>Building this surfaced a quieter bug. If you ran <code>redact --write</code> once, the agent then printed another key into the same session, and you scrubbed again, the second run overwrote <code>.bak</code> with the already-scrubbed file. The first originals were gone. Now a repeat scrub extends the existing backup with only the new tail, and refuses outright (with a clear message) if a <code>.bak</code> it did not write is sitting there.</p>
+<p>One reminder that has not changed: undo puts plaintext secrets back on disk. Rotate at the provider first either way.</p>
+<p>This is on <code>main</code> and ships in the next release. <a href="https://github.com/Blackman99/spillscan">Source and README</a>.</p>
+<p>— 2026-10-21</p>
+</article>
+</div>
+</body>
+</html>

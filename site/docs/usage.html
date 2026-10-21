@@ -25,8 +25,11 @@ spillscan scan           # exit 2 if findings
 spillscan scan --json
 spillscan redact         # dry-run
 spillscan redact --write # .bak then [REDACTED:&lt;rule&gt;]
+spillscan undo           # dry-run: which .bak originals can go back
+spillscan undo --write   # restore them (lines written after the scrub are kept)
 spillscan guard          # PreToolUse stdin JSON → decision
 spillscan mcp            # read-only MCP: scan_report, list_paths</pre>
+<p><strong>Undo.</strong> <code>spillscan undo</code> only restores a file that still begins with exactly what the scrub wrote. If the agent kept appending to the session, those new lines are kept after the restored originals (<code>appended</code>). Anything else is <code>diverged</code> and left alone with its <code>.bak</code>, and the exit code is 1. Running <code>redact --write</code> a second time extends the existing <code>.bak</code> rather than overwriting it, so the first originals are never lost. <em>On <code>main</code>; ships in the next release.</em></p>
 <p>Pass explicit paths to limit scope: <code>spillscan scan ~/.claude/projects/foo</code></p>
 
 </article>

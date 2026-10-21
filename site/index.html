@@ -86,7 +86,8 @@ CONTAMINATED — 3 distinct secrets in 2 files.</pre></div></li>
     <li><span class="n">4</span><div><h3>Absorb</h3><p>Preview with <code>spillscan redact</code>, then apply. JSONL stays valid, each file keeps a <code>.bak</code>.</p>
 <pre class="cmd">$ spillscan redact --write
 REDACT (write)  files=2 replaced=3
-<b class="ok">SCRUBBED</b> — 3 secrets replaced with [REDACTED:&lt;rule&gt;]</pre></div></li>
+<b class="ok">SCRUBBED</b> — 3 secrets replaced with [REDACTED:&lt;rule&gt;]</pre>
+<p class="undo-note">Scrubbed the wrong thing? <code>spillscan undo</code> puts the <code>.bak</code> originals back and keeps every line the agent wrote since.</p></div></li>
   </ol>
 </section>
 

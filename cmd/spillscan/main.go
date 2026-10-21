@@ -27,6 +27,7 @@ coding-agent session transcripts — and scrub them in place with a backup.
 Usage:
   spillscan scan [--json] [--agent NAME] [--no-color] [paths...]
   spillscan redact [--write] [--json] [paths...]
+  spillscan undo [--write] [--json] [paths...]
   spillscan paths [--json]
   spillscan guard          # Claude Code PreToolUse hook (stdin → stdout)
   spillscan mcp            # read-only MCP stdio (scan_report, list_paths)
@@ -37,7 +38,7 @@ Colors follow the terminal; set NO_COLOR=1 or pass --no-color to disable.
 Exit codes: 0 clean/ok · 2 findings (scan) · 1 error
 `
 
-var commands = []string{"scan", "redact", "paths", "guard", "mcp", "version", "help"}
+var commands = []string{"scan", "redact", "undo", "paths", "guard", "mcp", "version", "help"}
 
 func main() { os.Exit(run(os.Args[1:], os.Stdout, os.Stderr)) }
 
@@ -51,6 +52,8 @@ func run(args []string, out, errw io.Writer) int {
 		return cmdScan(args[1:], out, errw)
 	case "redact":
 		return cmdRedact(args[1:], out, errw)
+	case "undo":
+		return cmdUndo(args[1:], out, errw)
 	case "paths":
 		return cmdPaths(args[1:], out, errw)
 	case "guard":
@@ -308,11 +311,120 @@ func cmdRedact(args []string, out, errw io.Writer) int {
 			fmt.Fprintf(out, "  %s %s\n", p.dim("bak"), tildify(b))
 		}
 		fmt.Fprintf(out, "%s — %d %s replaced with [REDACTED:<rule>]. Verify: %s\n", p.ok("SCRUBBED"), res.Replaced, plural(res.Replaced, "secret", "secrets"), p.amber("spillscan scan"))
-		fmt.Fprintln(out, p.dim("  Delete the .bak files once you're satisfied — they still hold the originals."))
+		fmt.Fprintln(out, p.dim("  The .bak files still hold the originals: delete them once you're satisfied, or put them back with 'spillscan undo'."))
 	default:
 		fmt.Fprintf(out, "Would replace %d %s. Nothing changed. Apply with: %s\n", res.Replaced, plural(res.Replaced, "secret", "secrets"), p.amber("spillscan redact --write"+scope))
 	}
 	return 0
+}
+
+func cmdUndo(args []string, out, errw io.Writer) int {
+	write, asJSON, noColor := false, false, false
+	var rest []string
+	for _, a := range args {
+		switch a {
+		case "--write", "-write":
+			write = true
+		case "--json", "-json":
+			asJSON = true
+		case "--no-color", "-no-color":
+			noColor = true
+		case "-h", "--help":
+			fmt.Fprintln(out, "spillscan undo [--write] [--json] [paths...]")
+			fmt.Fprintln(out, "  Put back the originals that 'redact --write' saved as <file>.bak.")
+			fmt.Fprintln(out, "  Without --write: dry-run, nothing is changed.")
+			fmt.Fprintln(out, "  Lines the agent appended after the scrub are kept; a file edited any other")
+			fmt.Fprintln(out, "  way is reported as diverged and left alone. The .bak is removed once restored.")
+			fmt.Fprintln(out, "  Exit 1 if any backup could not be restored.")
+			return 0
+		default:
+			if isFlag(a) {
+				return badFlag(errw, "undo", a, []string{"--write", "--json", "--no-color", "--help"})
+			}
+			rest = append(rest, a)
+		}
+	}
+	scope := ""
+	if len(rest) > 0 {
+		for _, r := range rest {
+			if _, err := os.Stat(r); err != nil {
+				fmt.Fprintf(errw, "spillscan undo: path not found: %s\n", r)
+				return 1
+			}
+		}
+		if len(rest) <= 3 {
+			q := make([]string, len(rest))
+			for i, r := range rest {
+				q[i] = shellQuote(r)
+			}
+			scope = " " + strings.Join(q, " ")
+		} else {
+			scope = " <paths>"
+		}
+	} else {
+		roots, err := paths.Discover("")
+		if err != nil {
+			fmt.Fprintln(errw, "spillscan undo:", err)
+			return 1
+		}
+		for _, r := range roots {
+			rest = append(rest, r.Path)
+		}
+	}
+	baks, err := redact.FindBackups(rest)
+	if err != nil {
+		fmt.Fprintln(errw, "spillscan undo:", err)
+		return 1
+	}
+	res, err := redact.Undo(baks, redact.Options{Write: write})
+	if err != nil {
+		fmt.Fprintln(errw, "spillscan undo:", err)
+		return 1
+	}
+	code := 0
+	if res.Skipped > 0 {
+		code = 1
+	}
+	if asJSON {
+		enc := json.NewEncoder(out)
+		enc.SetIndent("", "  ")
+		_ = enc.Encode(res)
+		return code
+	}
+	p := newPainter(out, noColor)
+	mode := p.amber("dry-run")
+	if write {
+		mode = p.contam("write")
+	}
+	fmt.Fprintf(out, "%s (%s)  backups=%d restorable=%d\n", p.amber(p.bold("UNDO")), mode, len(res.Items), res.Restored)
+	if len(res.Items) == 0 {
+		fmt.Fprintln(out, p.amber("NO READING")+" — no spillscan .bak backups found; nothing to put back.")
+		return 0
+	}
+	tw := tabwriter.NewWriter(out, 0, 4, 2, ' ', 0)
+	fmt.Fprintln(tw, p.dim("STATE\tFILE\tNOTE"))
+	for _, it := range res.Items {
+		state, note := p.ok(it.State), "unchanged since the scrub"
+		switch it.State {
+		case redact.UndoAppended:
+			note = fmt.Sprintf("keeps %d %s the agent wrote after the scrub", it.TailLines, plural(it.TailLines, "line", "lines"))
+		case redact.UndoDiverged:
+			state, note = p.contam(it.State), "edited since the scrub; compare with "+tildify(it.Backup)+" by hand"
+		case redact.UndoMissing:
+			state, note = p.contam(it.State), "only "+tildify(it.Backup)+" is left; copy it back if you want it"
+		}
+		fmt.Fprintf(tw, "%s\t%s\t%s\n", state, tildify(it.Path), p.dim(note))
+	}
+	_ = tw.Flush()
+	switch {
+	case res.Restored == 0:
+		fmt.Fprintln(out, p.contam("NOTHING RESTORED")+" — every backup needs a manual look (see NOTE).")
+	case write:
+		fmt.Fprintf(out, "%s — %d %s put back and %s removed. The secrets are in plaintext again.\n", p.ok("RESTORED"), res.Restored, plural(res.Restored, "transcript", "transcripts"), plural(res.Restored, "its .bak", "their .bak files"))
+	default:
+		fmt.Fprintf(out, "Would restore %d %s, secrets included. Nothing changed. Apply with: %s\n", res.Restored, plural(res.Restored, "transcript", "transcripts"), p.amber("spillscan undo --write"+scope))
+	}
+	return code
 }
 
 func cmdPaths(args []string, out, errw io.Writer) int {

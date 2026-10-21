@@ -7,7 +7,7 @@
 - GoReleaser binaries; GitHub Pages landing with Geiger meter demo (redesigned 2026-10-15 as a hazmat absorbent pad)
 
 ## v0.2
-- `spillscan undo` from backup bundle
+- `spillscan undo`: restore `.bak` originals, keeping lines appended after the scrub; repeat `redact --write` never overwrites the first backup (done on main, unreleased)
 - More agent roots as paths stabilize (Copilot CLI, Desktop variants)
 - Entropy tuning / false-positive allowlist file
 

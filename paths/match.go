@@ -76,3 +76,15 @@ func Walk(dir string) []string {
 	})
 	return out
 }
+
+// WalkBackups returns every spillscan backup (<transcript>.bak) under dir.
+func WalkBackups(dir string) []string {
+	var out []string
+	_ = filepath.Walk(dir, func(p string, info os.FileInfo, err error) error {
+		if err == nil && info != nil && !info.IsDir() && strings.HasSuffix(p, ".bak") && IsTranscript(strings.TrimSuffix(p, ".bak")) {
+			out = append(out, p)
+		}
+		return nil
+	})
+	return out
+}
