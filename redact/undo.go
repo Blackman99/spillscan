@@ -84,12 +84,12 @@ func Undo(backups []string, opt Options) (*UndoResult, error) {
 		case err != nil:
 			return res, err
 		default:
-			scrubbed, _ := Scrub(orig, paths.IsJSONL(path))
-			if !bytes.HasPrefix(cur, scrubbed) {
+			n, ok := scrubbedPrefix(orig, cur, paths.IsJSONL(path), opt.Allow.For(path))
+			if !ok {
 				it.State = UndoDiverged
 				break
 			}
-			tail := cur[len(scrubbed):]
+			tail := cur[n:]
 			it.State = UndoExact
 			if len(tail) > 0 {
 				it.State = UndoAppended

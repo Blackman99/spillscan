@@ -23,7 +23,8 @@
 <p><strong>Will this rotate my keys?</strong> No. It reports and can redact local transcripts. You still rotate at the provider.</p>
 <p><strong>Can I take a scrub back?</strong> Yes: <code>spillscan undo</code> previews it and <code>spillscan undo --write</code> puts the <code>.bak</code> originals back, keeping any lines the agent wrote after the scrub. A file edited in any other way is left alone.</p>
 <p><strong>Does MCP redact?</strong> No. MCP exposes read-only <code>scan_report</code> and <code>list_paths</code>.</p>
-<p><strong>False positives?</strong> Generic KEY= assignments require high entropy. Open an issue with a fake fixture.</p>
+<p><strong>False positives?</strong> Generic KEY= assignments already require high entropy. For the rest, copy the finding's <code>FP</code> from scan output into <code>~/.config/spillscan/allow.txt</code> as <code>fp:&lt;FP&gt;</code>; you can also allowlist a rule under a path glob. See <a href="configuration.html#allowlist">Configuration</a>. If a detector is wrong for everyone, open an issue with a fake fixture.</p>
+<p><strong>Does the fingerprint leak the secret?</strong> It is the first 12 hex characters of a SHA-256 over the value. Detectors only fire on long, high-entropy strings, so it cannot be reversed or guessed in practice, and it is safe to paste into an allowlist or an issue.</p>
 <p><strong>vs Stroq?</strong> Stroq is a firewall over known local values; spillscan is the cleanup meter for pattern-matched spills already on disk.</p>
 
 </article>

@@ -27,9 +27,12 @@ spillscan redact         # dry-run
 spillscan redact --write # .bak then [REDACTED:&lt;rule&gt;]
 spillscan undo           # dry-run: which .bak originals can go back
 spillscan undo --write   # restore them (lines written after the scrub are kept)
+spillscan scan --allow team-fakes.txt   # skip known false positives (see Configuration)
+spillscan scan --no-allow               # ignore every allowlist, show everything
 spillscan guard          # PreToolUse stdin JSON → decision
 spillscan mcp            # read-only MCP: scan_report, list_paths</pre>
-<p><strong>Undo.</strong> <code>spillscan undo</code> only restores a file that still begins with exactly what the scrub wrote. If the agent kept appending to the session, those new lines are kept after the restored originals (<code>appended</code>). Anything else is <code>diverged</code> and left alone with its <code>.bak</code>, and the exit code is 1. Running <code>redact --write</code> a second time extends the existing <code>.bak</code> rather than overwriting it, so the first originals are never lost. <em>On <code>main</code>; ships in the next release.</em></p>
+<p><strong>Undo.</strong> <code>spillscan undo</code> only restores a file that still begins with exactly what the scrub wrote. If the agent kept appending to the session, those new lines are kept after the restored originals (<code>appended</code>). Anything else is <code>diverged</code> and left alone with its <code>.bak</code>, and the exit code is 1. Running <code>redact --write</code> a second time extends the existing <code>.bak</code> rather than overwriting it, so the first originals are never lost.</p>
+<p><strong>False positives.</strong> Every finding has a 12-character <code>FP</code> (fingerprint) column. Put <code>fp:&lt;FP&gt;</code> on a line in <code>~/.config/spillscan/allow.txt</code> and scan, redact and the MCP <code>scan_report</code> skip that value from then on; scan's header says how many it hid (<code>allowlisted=N</code>). The full format is on <a href="configuration.html#allowlist">Configuration</a>. <em>On <code>main</code>; ships in the next release.</em></p>
 <p>Pass explicit paths to limit scope: <code>spillscan scan ~/.claude/projects/foo</code></p>
 
 </article>

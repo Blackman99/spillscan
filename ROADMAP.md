@@ -10,10 +10,12 @@
 - `spillscan undo`: restore `.bak` originals, keeping lines appended after the scrub; repeat `redact --write` never overwrites the first backup
 - scan/redact cover Claude Code `tool-results/` spill files and `*.jsonl.superseded-*` transcripts
 
+## Unreleased on main
+- False-positive allowlist file: `~/.config/spillscan/allow.txt` plus `--allow FILE` / `--no-allow` on scan, redact and undo; entries by `fp:` (value fingerprint), `rule:`, `path:` glob or `value:`; findings now carry a 12-hex fingerprint; scan reports `allowlisted=N`; MCP `scan_report` honors the default list
+
 ## v0.3 candidates
 - More agent roots as paths stabilize (Copilot CLI, Desktop variants)
-- Entropy tuning / false-positive allowlist file
-
+- Entropy tuning for `generic-assign` (wait for real false-positive reports; the allowlist covers the known ones)
 - Provider "rotate here" links in report
 - Optional PostToolUse companion (when vendors stop ignoring Bash output hooks)
 

@@ -1,0 +1,53 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>已知的假密钥，标记一次就够了</title>
+<meta name="description" content="spillscan 现在支持误报白名单，用指纹标记已知的假值，不必把值本身写下来。">
+<meta property="og:title" content="已知的假密钥，标记一次就够了">
+<meta property="og:image" content="https://blackman99.github.io/spillscan/og.png">
+<meta name="twitter:card" content="summary_large_image">
+<link rel="stylesheet" href="../style.css">
+<link rel="icon" href="../favicon.svg" type="image/svg+xml">
+</head>
+<body class="panel-texture">
+<div class="stripe"></div>
+<nav class="top"><a href="../">HOME</a><a href="../docs/">DOCS</a><a href="./">BLOG</a></nav>
+<div class="stack" style="padding-top:3rem">
+<article class="inst">
+<h2>已知的假密钥，标记一次就够了</h2>
+<p>只要你让 agent 写过 AWS 示例代码，会话记录里多半就有 <code>AKIAIOSFODNN7EXAMPLE</code>。这是 AWS 官方文档里的示例密钥，完全符合 AWS 的格式，于是 spillscan 每次都会报它。测试里的 fixture token、从教程里粘过来的 JWT 也一样。同一条无害的结果看到第三遍，人就开始草草扫过报告。总是误报的警报，最后只会让人学会无视它。</p>
+<p>所以 spillscan 现在会读取一份白名单。关键在于名单里写什么。</p>
+
+<h3>写指纹，不写值</h3>
+<p>每条结果现在多了一列 <code>FP</code>：对值做 SHA-256（混入 spillscan 专用前缀）后取前 12 位十六进制。它能认出这个值，但不包含这个值。</p>
+<pre class="cmd">$ spillscan scan
+RULE        PREVIEW    FP            AGENT        FILE:LINE
+aws-akia    AKIA…MPLE  8cc03843ecd0  claude-code  ~/.claude/projects/…/x.jsonl:128
+github-pat  ghp_…a91F  1d6e40b2c9f7  claude-code  ~/.claude/projects/…/x.jsonl:128
+...
+  Known-fake value? Add the line fp:&lt;FP&gt; to ~/.config/spillscan/allow.txt; scan and redact then skip it.</pre>
+<p>把认得出的那一个抄进 <code>~/.config/spillscan/allow.txt</code>：</p>
+<pre class="cmd">fp:8cc03843ecd0   # AWS 文档示例密钥</pre>
+<p>为什么不让人直接写值？因为白名单恰恰是会被提交进 dotfiles、发给同事、贴进 issue 的那个文件。如果里面存的是值，哪天有人把一个<em>以为</em>是假的密钥加进去，白名单本身就成了新的泄露点。存指纹的话，最坏也只是一段 12 位的哈希。另有 <code>value:</code> 用来写那些本来就是假的字面值，文档里也写明了它会原样保存你输入的内容。</p>
+
+<h3>也可以按规则和位置</h3>
+<p>有时候噪音是一整类：比如你做认证教程那几个会话里的所有 JWT。同一行的多个条件必须同时满足，不同行之间是“或”。</p>
+<pre class="cmd">rule:jwt path:~/.claude/projects/*auth-tutorial*/**
+path:~/.codex/sessions/2026/01/**
+rule:generic-assign</pre>
+<p>glob 匹配的是会话文件的绝对路径：<code>*</code> 不跨目录，<code>**</code> 可以跨，<code>~/</code> 是家目录，不含斜杠的 glob 只匹配文件名。写错了，比如 <code>rule:jtw</code>，会直接报错退出：<code>allow.txt:1: unknown rule "jtw" (did you mean rule:jwt?)</code>。一份悄悄什么都匹配不上的白名单，比没有更糟。</p>
+
+<h3>藏起来的东西，都留了记录</h3>
+<p>隐藏结果是这个功能里有风险的那一半，所以 spillscan 会明说：表头写着 <code>allowlisted=1</code>，末尾一行注明是哪份名单藏的，<code>spillscan scan --no-allow</code> 能看到原始读数。被白名单命中的结果不会导致退出码 2，CI 检查可以通过，但 <code>--json</code> 里仍然有这个计数。<code>redact</code> 对这些值原样保留，并报告保留了几个。MCP 的 <code>scan_report</code> 遵循默认白名单，而且依然只读。</p>
+<p>额外的名单用 <code>--allow FILE</code> 传入，可以重复。scan 给出的后续命令会带上它们，所以你照抄的那条清洗命令，跳过的正好是这次扫描隐藏的那些。</p>
+
+<h3>测试抓到的一个 bug</h3>
+<p>PEM 私钥跨多行。在 JSONL 文件里，这些换行存成 <code>\n</code> 转义；JSON 解码之后则是真正的换行。scan 对原始字节算指纹，redact 遍历的是解码后的 JSON，于是同一把密钥得到两个不同的指纹，加进白名单的 PEM 块照样会被清洗。现在 redact 两种形式都会检查，而且有一个测试专门确保去掉这个检查就会失败。</p>
+<p>该功能已在 <code>main</code> 上，会随下一个版本发布。格式细节见 <a href="../docs/configuration.html#allowlist">Configuration</a>；<a href="https://github.com/Blackman99/spillscan">源码与 README</a>。最后提醒一句：只有确认是假的才该加白名单。真泄露的密钥，照样要去轮换。</p>
+<p>— 2026-10-28</p>
+</article>
+</div>
+</body>
+</html>

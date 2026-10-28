@@ -20,6 +20,32 @@
 <article class="inst">
 <h2>Configuration</h2>
 
+<h3 id="allowlist">False-positive allowlist</h3>
+<p>Some secret-shaped strings are fine to keep: a docs example key, a fixture token, a JWT from a public tutorial. List them once and spillscan stops reporting them. Allowlisted findings are left out of <code>scan</code>, left untouched by <code>redact</code>, and left out of the MCP <code>scan_report</code> (which only reports how many it hid). <em>On <code>main</code>; ships in the next release.</em></p>
+<p>Where the list comes from:</p>
+<ul>
+<li><code>~/.config/spillscan/allow.txt</code> (or <code>$XDG_CONFIG_HOME/spillscan/allow.txt</code>), read automatically when it exists.</li>
+<li><code>--allow FILE</code> on <code>scan</code>, <code>redact</code> and <code>undo</code>, repeatable, added on top. A missing file is an error, not a silent no-op.</li>
+<li><code>--no-allow</code> ignores every list, for when you want the raw reading.</li>
+</ul>
+<p>One entry per line; <code>#</code> starts a comment. Keys on one line must all match; separate lines are alternatives.</p>
+<pre class="cmd"># ~/.config/spillscan/allow.txt
+fp:3f9a1c0b7e21                             # by fingerprint
+rule:jwt path:~/.claude/projects/*docs*/**  # rule + place
+path:~/.codex/sessions/2026/01/**           # a whole place
+rule:generic-assign                         # a whole rule
+value:AKIAIOSFODNN7EXAMPLE                  # fake literal</pre>
+<table>
+<tr><th>Key</th><th>Matches</th></tr>
+<tr><td><code>fp:</code></td><td>The value whose fingerprint starts with these hex chars (8 to 64; scan prints 12). The fingerprint is a domain-separated SHA-256 of the value, so you can allowlist a finding without the value ever being printed or stored.</td></tr>
+<tr><td><code>rule:</code></td><td>A detector id (see <a href="reference.html">Reference</a>). A typo is an error with a suggestion.</td></tr>
+<tr><td><code>path:</code></td><td>A glob over the transcript's absolute path. <code>*</code> stays inside one segment, <code>**</code> crosses segments, <code>?</code> is one character, <code>~/</code> is your home. Without <code>/</code> it matches the file name; a relative glob matches the trailing segments, like <code>.gitignore</code>.</td></tr>
+<tr><td><code>value:</code></td><td>The exact literal. Only for values that are fake by construction: unlike <code>fp:</code>, it stores the value in the file.</td></tr>
+</table>
+<p>A bad line stops the run with <code>file:line</code> and what to write instead (a bare <code>3f9a1c0b7e21</code> gets "write it as fp:3f9a1c0b7e21"). When scan hid something, it says so: <code>allowlisted=2</code> in the header and a line naming the list. The follow-up <code>redact</code> commands it prints repeat any <code>--allow</code> file, so the scrub skips exactly what the survey hid.</p>
+<p>Why no per-project file: transcripts live under your home, not in a repo, and spillscan runs from any directory. A list that changed with the current directory would make the same scan give different readings.</p>
+<p><code>undo</code> re-runs the scrub on each <code>.bak</code> to check the file is unchanged; pass it the same <code>--allow</code> files you scrubbed with. It also accepts a scrub that ran before the allowlist existed.</p>
+
 <h3>Claude Code PreToolUse</h3>
 <pre class="cmd">{
   "hooks": {

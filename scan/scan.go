@@ -9,29 +9,37 @@ import (
 	"strings"
 	"time"
 
+	"github.com/Blackman99/spillscan/allow"
 	"github.com/Blackman99/spillscan/detect"
 	"github.com/Blackman99/spillscan/paths"
 )
 
 // Finding is a secret hit located in a transcript.
 type Finding struct {
-	Rule    string    `json:"rule"`
-	Preview string    `json:"preview"`
-	Path    string    `json:"path"`
-	Line    int       `json:"line"`
-	Offset  int       `json:"offset"`
-	Agent   string    `json:"agent"`
-	Mtime   time.Time `json:"mtime"`
-	Secret  string    `json:"-"`
+	Rule    string `json:"rule"`
+	Preview string `json:"preview"`
+	// Fingerprint identifies the value without revealing it; put
+	// fp:<Fingerprint> in an allowlist to silence a false positive.
+	Fingerprint string    `json:"fingerprint"`
+	Path        string    `json:"path"`
+	Line        int       `json:"line"`
+	Offset      int       `json:"offset"`
+	Agent       string    `json:"agent"`
+	Mtime       time.Time `json:"mtime"`
+	Secret      string    `json:"-"`
 }
 
 // Result aggregates a scan.
 type Result struct {
-	Files     int          `json:"files"`
-	Findings  []Finding    `json:"findings"`
-	Skipped   []string     `json:"skipped,omitempty"` // files that could not be read
-	Roots     []paths.Root `json:"roots,omitempty"`
-	ScannedAt time.Time    `json:"scanned_at"`
+	Files    int       `json:"files"`
+	Findings []Finding `json:"findings"`
+	Skipped  []string  `json:"skipped,omitempty"` // files that could not be read
+	// Allowlisted counts findings an allowlist entry matched; they are
+	// not in Findings.
+	Allowlisted int          `json:"allowlisted"`
+	AllowFiles  []string     `json:"allow_files,omitempty"`
+	Roots       []paths.Root `json:"roots,omitempty"`
+	ScannedAt   time.Time    `json:"scanned_at"`
 }
 
 // Options controls scan scope.
@@ -39,6 +47,7 @@ type Options struct {
 	Home  string
 	Agent string
 	Paths []string // explicit files or dirs; empty = discover
+	Allow *allow.List
 }
 
 // Run discovers (or uses Paths) and scans transcripts (see paths.IsTranscript).
@@ -72,12 +81,21 @@ func Run(opt Options) (*Result, error) {
 		}
 	}
 	res.Files = len(files)
+	if opt.Allow != nil {
+		res.AllowFiles = opt.Allow.Files
+	}
 	for _, f := range files {
 		fs, err := scanFile(f)
 		if err != nil {
 			res.Skipped = append(res.Skipped, f)
 		}
-		res.Findings = append(res.Findings, fs...)
+		for _, x := range fs {
+			if opt.Allow.Allowed(x.Rule, x.Secret, x.Path) {
+				res.Allowlisted++
+				continue
+			}
+			res.Findings = append(res.Findings, x)
+		}
 	}
 	return res, nil
 }
@@ -105,14 +123,15 @@ func scanFile(path string) ([]Finding, error) {
 		line := sc.Text()
 		for _, d := range detect.Scan(line) {
 			out = append(out, Finding{
-				Rule:    d.Rule,
-				Preview: d.Preview,
-				Path:    path,
-				Line:    lineNo,
-				Offset:  d.Start,
-				Agent:   agent,
-				Mtime:   st.ModTime().UTC(),
-				Secret:  d.Secret,
+				Rule:        d.Rule,
+				Preview:     d.Preview,
+				Fingerprint: detect.Fingerprint(d.Secret),
+				Path:        path,
+				Line:        lineNo,
+				Offset:      d.Start,
+				Agent:       agent,
+				Mtime:       st.ModTime().UTC(),
+				Secret:      d.Secret,
 			})
 		}
 	}

@@ -8,6 +8,7 @@ import (
 	"io"
 	"os"
 
+	"github.com/Blackman99/spillscan/allow"
 	"github.com/Blackman99/spillscan/paths"
 	"github.com/Blackman99/spillscan/scan"
 )
@@ -15,6 +16,9 @@ import (
 // Run starts the JSON-RPC MCP loop on stdin/stdout.
 // Version is reported in serverInfo; set by main from the build version.
 var Version = "dev"
+
+// Home overrides $HOME for transcript discovery (tests); empty = $HOME.
+var Home = ""
 
 func Run(in io.Reader, out io.Writer) error {
 	br := bufio.NewReader(in)
@@ -53,7 +57,7 @@ func Run(in io.Reader, out io.Writer) error {
 				"tools": []map[string]any{
 					{
 						"name":        "scan_report",
-						"description": "Scan local AI agent transcripts for spilled secrets. Returns rule, redacted preview, path, line, agent. Never returns raw secret values.",
+						"description": "Scan local AI agent transcripts for spilled secrets. Returns rule, redacted preview, fingerprint, path, line, agent, plus how many findings the user's allowlist (~/.config/spillscan/allow.txt) hid. Never returns raw secret values. Read-only: never redacts.",
 						"inputSchema": map[string]any{
 							"type": "object",
 							"properties": map[string]any{
@@ -74,7 +78,12 @@ func Run(in io.Reader, out io.Writer) error {
 			switch name {
 			case "scan_report":
 				agent, _ := args["agent"].(string)
-				res, err := scan.Run(scan.Options{Agent: agent})
+				al, err := allow.Load(true, nil)
+				if err != nil {
+					_ = writeErr(out, id, -32000, err.Error())
+					continue
+				}
+				res, err := scan.Run(scan.Options{Agent: agent, Home: Home, Allow: al})
 				if err != nil {
 					_ = writeErr(out, id, -32000, err.Error())
 					continue
@@ -82,16 +91,16 @@ func Run(in io.Reader, out io.Writer) error {
 				safe := make([]map[string]any, 0, len(res.Findings))
 				for _, f := range res.Findings {
 					safe = append(safe, map[string]any{
-						"rule": f.Rule, "preview": f.Preview, "path": f.Path,
+						"rule": f.Rule, "preview": f.Preview, "fingerprint": f.Fingerprint, "path": f.Path,
 						"line": f.Line, "agent": f.Agent, "mtime": f.Mtime,
 					})
 				}
-				body, _ := json.Marshal(map[string]any{"files": res.Files, "findings": safe, "count": len(safe)})
+				body, _ := json.Marshal(map[string]any{"files": res.Files, "findings": safe, "count": len(safe), "allowlisted": res.Allowlisted})
 				_ = writeResult(out, id, map[string]any{
 					"content": []map[string]any{{"type": "text", "text": string(body)}},
 				})
 			case "list_paths":
-				roots, err := paths.Discover("")
+				roots, err := paths.Discover(Home)
 				if err != nil {
 					_ = writeErr(out, id, -32000, err.Error())
 					continue

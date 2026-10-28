@@ -7,6 +7,7 @@ import (
 	"fmt"
 	"os"
 
+	"github.com/Blackman99/spillscan/allow"
 	"github.com/Blackman99/spillscan/detect"
 	"github.com/Blackman99/spillscan/paths"
 )
@@ -18,21 +19,25 @@ type Result struct {
 	Backups  []string       `json:"backups,omitempty"`
 	DryRun   bool           `json:"dry_run"`
 	PerFile  map[string]int `json:"per_file,omitempty"`
+	// Allowlisted counts detected values an allowlist entry kept in place.
+	Allowlisted int `json:"allowlisted"`
 }
 
 // Options controls redaction.
 type Options struct {
-	Write bool // false = dry-run
+	Write bool        // false = dry-run
+	Allow *allow.List // matching findings are left untouched
 }
 
 // Run redacts secrets in the given files. Always writes .bak when Write.
 func Run(files []string, opt Options) (*Result, error) {
 	res := &Result{DryRun: !opt.Write, PerFile: map[string]int{}}
 	for _, path := range files {
-		n, bak, err := redactFile(path, opt.Write)
+		n, kept, bak, err := redactFile(path, opt.Write, opt.Allow.For(path))
 		if err != nil {
 			return res, err
 		}
+		res.Allowlisted += kept
 		res.Files++
 		res.Replaced += n
 		res.PerFile[path] = n
@@ -43,30 +48,48 @@ func Run(files []string, opt Options) (*Result, error) {
 	return res, nil
 }
 
-func redactFile(path string, write bool) (replaced int, backup string, err error) {
+func redactFile(path string, write bool, skip Skip) (replaced, kept int, backup string, err error) {
 	if paths.IsBinary(path) {
-		return 0, "", nil // e.g. an MCP image copy under tool-results/
+		return 0, 0, "", nil // e.g. an MCP image copy under tool-results/
 	}
 	raw, err := os.ReadFile(path)
 	if err != nil {
-		return 0, "", err
+		return 0, 0, "", err
 	}
-	out, replaced := Scrub(raw, paths.IsJSONL(path))
+	out, replaced, kept := ScrubWith(raw, paths.IsJSONL(path), skip)
 	if !write || replaced == 0 {
-		return replaced, "", nil
+		return replaced, kept, "", nil
 	}
 	bak := path + ".bak"
-	orig, err := backupContent(path, bak, raw)
+	orig, err := backupContent(path, bak, raw, skip)
 	if err != nil {
-		return 0, "", err
+		return 0, 0, "", err
 	}
 	if err := os.WriteFile(bak, orig, 0o600); err != nil {
-		return 0, "", fmt.Errorf("backup: %w", err)
+		return 0, 0, "", fmt.Errorf("backup: %w", err)
 	}
 	if err := os.WriteFile(path, out, 0o600); err != nil {
-		return 0, bak, err
+		return 0, 0, bak, err
 	}
-	return replaced, bak, nil
+	return replaced, kept, bak, nil
+}
+
+// scrubbedPrefix finds what an earlier scrub of orig produced inside cur.
+// That scrub may have run with the allowlist in force now, or before the
+// allowlist existed, so both are tried. ok is false if cur does not start
+// with either (the file was edited some other way).
+func scrubbedPrefix(orig, cur []byte, jsonl bool, skip Skip) (n int, ok bool) {
+	cands := []Skip{skip}
+	if skip != nil {
+		cands = append(cands, nil)
+	}
+	for _, s := range cands {
+		scrubbed, _, _ := ScrubWith(orig, jsonl, s)
+		if bytes.HasPrefix(cur, scrubbed) {
+			return len(scrubbed), true
+		}
+	}
+	return 0, false
 }
 
 // backupContent returns what <file>.bak should hold before a scrub. On a
@@ -74,7 +97,7 @@ func redactFile(path string, write bool) (replaced int, backup string, err error
 // .bak and the agent has since appended to the transcript, the old backup is
 // extended with the new tail so it keeps holding every original byte — a
 // second `redact --write` must never overwrite the first originals.
-func backupContent(path, bak string, raw []byte) ([]byte, error) {
+func backupContent(path, bak string, raw []byte, skip Skip) ([]byte, error) {
 	old, err := os.ReadFile(bak)
 	if os.IsNotExist(err) {
 		return raw, nil
@@ -82,12 +105,16 @@ func backupContent(path, bak string, raw []byte) ([]byte, error) {
 	if err != nil {
 		return nil, fmt.Errorf("backup: %w", err)
 	}
-	scrubbed, _ := Scrub(old, paths.IsJSONL(path))
-	if !bytes.HasPrefix(raw, scrubbed) {
+	n, ok := scrubbedPrefix(old, raw, paths.IsJSONL(path), skip)
+	if !ok {
 		return nil, fmt.Errorf("%s already exists and does not match %s; move it aside (it may hold originals) and retry", bak, path)
 	}
-	return append(old, raw[len(scrubbed):]...), nil
+	return append(old, raw[n:]...), nil
 }
+
+// Skip reports whether a detected value must be left in place
+// (allowlisted). A nil Skip keeps nothing.
+type Skip func(rule, secret string) bool
 
 // Scrub returns raw with every detected secret replaced by
 // [REDACTED:<rule>] and the number of replacements. jsonl selects the
@@ -95,9 +122,16 @@ func backupContent(path, bak string, raw []byte) ([]byte, error) {
 // files) is plain text. Untouched lines keep their exact bytes, including
 // CRLF and a missing final newline.
 func Scrub(raw []byte, jsonl bool) ([]byte, int) {
-	var out bytes.Buffer
-	out.Grow(len(raw))
-	replaced := 0
+	out, n, _ := ScrubWith(raw, jsonl, nil)
+	return out, n
+}
+
+// ScrubWith is Scrub that leaves values skip accepts in place; kept counts
+// them. A line whose every finding is kept is left byte-for-byte unchanged.
+func ScrubWith(raw []byte, jsonl bool, skip Skip) (out []byte, replaced, kept int) {
+	sc := &scrubber{skip: skip}
+	var buf bytes.Buffer
+	buf.Grow(len(raw))
 	for _, chunk := range bytes.SplitAfter(raw, []byte("\n")) {
 		if len(chunk) == 0 {
 			continue
@@ -113,82 +147,116 @@ func Scrub(raw []byte, jsonl bool) ([]byte, int) {
 		var newLine string
 		var n int
 		if jsonl {
-			newLine, n = redactLine(string(body))
+			newLine, n = sc.line(string(body))
 		} else {
-			newLine, n = redactText(string(body))
+			newLine, n = sc.text(string(body))
 		}
 		replaced += n
 		if n == 0 {
-			out.Write(chunk)
+			buf.Write(chunk)
 			continue
 		}
-		out.WriteString(newLine)
-		out.Write(eol)
+		buf.WriteString(newLine)
+		buf.Write(eol)
 	}
-	return out.Bytes(), replaced
+	return buf.Bytes(), replaced, sc.kept
 }
 
-// redactText replaces secrets in a plain-text line in place.
-func redactText(line string) (string, int) {
-	findings := detect.Scan(line)
-	b := []byte(line)
-	for i := len(findings) - 1; i >= 0; i-- {
-		f := findings[i]
+type scrubber struct {
+	skip Skip
+	kept int
+}
+
+// filter drops kept findings, counting them when count is set. decoded marks
+// text that came out of a JSON string: scan sees the escaped form (a PEM key
+// has \n, not newlines), so both forms are checked against the allowlist.
+func (sc *scrubber) filter(fs []detect.Finding, decoded, count bool) []detect.Finding {
+	if sc.skip == nil {
+		return fs
+	}
+	out := fs[:0:0]
+	for _, f := range fs {
+		if sc.skip(f.Rule, f.Secret) || (decoded && sc.skip(f.Rule, jsonEscape(f.Secret))) {
+			if count {
+				sc.kept++
+			}
+			continue
+		}
+		out = append(out, f)
+	}
+	return out
+}
+
+func jsonEscape(s string) string {
+	var b bytes.Buffer
+	enc := json.NewEncoder(&b)
+	enc.SetEscapeHTML(false)
+	if enc.Encode(s) != nil {
+		return s
+	}
+	out := bytes.TrimSuffix(b.Bytes(), []byte("\n"))
+	return string(out[1 : len(out)-1])
+}
+
+func replaceSpans(s string, fs []detect.Finding) string {
+	b := []byte(s)
+	for i := len(fs) - 1; i >= 0; i-- {
+		f := fs[i]
 		b = append(b[:f.Start:f.Start], append([]byte("[REDACTED:"+f.Rule+"]"), b[f.End:]...)...)
 	}
-	return string(b), len(findings)
+	return string(b)
 }
 
-func redactLine(line string) (string, int) {
-	findings := detect.Scan(line)
-	if len(findings) == 0 {
+// text replaces secrets in a plain-text line in place.
+func (sc *scrubber) text(line string) (string, int) {
+	fs := sc.filter(detect.Scan(line), false, true)
+	if len(fs) == 0 {
+		return line, 0
+	}
+	return replaceSpans(line, fs), len(fs)
+}
+
+func (sc *scrubber) line(line string) (string, int) {
+	all := detect.Scan(line)
+	if len(all) == 0 {
+		return line, 0
+	}
+	// Leave the line byte-identical when everything on it is allowlisted.
+	if live := sc.filter(all, false, false); len(live) == 0 {
+		sc.kept += len(all)
 		return line, 0
 	}
 	// Try JSON-aware rewrite.
 	var v any
 	if json.Unmarshal([]byte(line), &v) == nil {
 		n := 0
-		v2 := walkReplace(v, &n)
-		b, err := json.Marshal(v2)
-		if err == nil {
+		v2 := sc.walk(v, &n)
+		if b, err := json.Marshal(v2); err == nil {
 			return string(b), n
 		}
 	}
-	// Fallback: replace from end so offsets stay valid.
-	b := []byte(line)
-	n := 0
-	for i := len(findings) - 1; i >= 0; i-- {
-		f := findings[i]
-		repl := []byte("[REDACTED:" + f.Rule + "]")
-		b = append(b[:f.Start], append(repl, b[f.End:]...)...)
-		n++
-	}
-	return string(b), n
+	// Fallback: replace raw spans from the end so offsets stay valid.
+	fs := sc.filter(all, false, true)
+	return replaceSpans(line, fs), len(fs)
 }
 
-func walkReplace(v any, n *int) any {
+func (sc *scrubber) walk(v any, n *int) any {
 	switch t := v.(type) {
 	case string:
-		fs := detect.Scan(t)
+		fs := sc.filter(detect.Scan(t), true, true)
 		if len(fs) == 0 {
 			return t
 		}
-		b := []byte(t)
-		for i := len(fs) - 1; i >= 0; i-- {
-			f := fs[i]
-			repl := []byte("[REDACTED:" + f.Rule + "]")
-			b = append(b[:f.Start], append(repl, b[f.End:]...)...)
-			*n++
-		}
-		return string(b)
+		*n += len(fs)
+		return replaceSpans(t, fs)
 	case map[string]any:
 		for k, vv := range t {
-			t[k] = walkReplace(vv, n)
+			t[k] = sc.walk(vv, n)
 		}
 		return t
 	case []any:
 		for i, vv := range t {
-			t[i] = walkReplace(vv, n)
+			t[i] = sc.walk(vv, n)
 		}
 		return t
 	default:
