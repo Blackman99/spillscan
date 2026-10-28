@@ -2,6 +2,8 @@
 package detect
 
 import (
+	"crypto/sha256"
+	"encoding/hex"
 	"regexp"
 	"unicode"
 )
@@ -35,6 +37,24 @@ var rules = []rule{
 	{id: "pem-private", re: regexp.MustCompile(`(-----BEGIN (?:RSA |EC |OPENSSH )?PRIVATE KEY-----[\s\S]+?-----END (?:RSA |EC |OPENSSH )?PRIVATE KEY-----)`)},
 	{id: "jwt", re: regexp.MustCompile(`\b(eyJ[A-Za-z0-9_\-]{10,}\.[A-Za-z0-9_\-]{10,}\.[A-Za-z0-9_\-]{10,})\b`)},
 	{id: "generic-assign", re: regexp.MustCompile(`(?i)\b(?:KEY|TOKEN|PASSWORD|SECRET|API_KEY|ACCESS_KEY|AUTH_TOKEN)\s*[=:]\s*['"]?([A-Za-z0-9_\-./+=]{16,})['"]?`), min: 16},
+}
+
+// RuleIDs lists every detector rule id, in priority order.
+func RuleIDs() []string {
+	out := make([]string, len(rules))
+	for i, r := range rules {
+		out[i] = r.id
+	}
+	return out
+}
+
+// Fingerprint is a short, stable id for a secret value: the first 12 hex
+// chars of a domain-separated SHA-256. It lets you allowlist one value
+// without the value ever being printed. Detectors only fire on long,
+// high-entropy strings, so the prefix does not make guessing practical.
+func Fingerprint(secret string) string {
+	sum := sha256.Sum256([]byte("spillscan-fp-v1\x00" + secret))
+	return hex.EncodeToString(sum[:])[:12]
 }
 
 // Scan returns non-overlapping findings, highest-specificity rules first.

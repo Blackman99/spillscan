@@ -10,6 +10,7 @@ import (
 	"strings"
 	"text/tabwriter"
 
+	"github.com/Blackman99/spillscan/allow"
 	"github.com/Blackman99/spillscan/guard"
 	"github.com/Blackman99/spillscan/mcp"
 	"github.com/Blackman99/spillscan/paths"
@@ -25,15 +26,16 @@ Tell you, in one command, which secrets already spilled into your local AI
 coding-agent session transcripts — and scrub them in place with a backup.
 
 Usage:
-  spillscan scan [--json] [--agent NAME] [--no-color] [paths...]
-  spillscan redact [--write] [--json] [paths...]
-  spillscan undo [--write] [--json] [paths...]
+  spillscan scan [--json] [--agent NAME] [--allow FILE] [--no-allow] [--no-color] [paths...]
+  spillscan redact [--write] [--json] [--allow FILE] [--no-allow] [paths...]
+  spillscan undo [--write] [--json] [--allow FILE] [--no-allow] [paths...]
   spillscan paths [--json]
   spillscan guard          # Claude Code PreToolUse hook (stdin → stdout)
   spillscan mcp            # read-only MCP stdio (scan_report, list_paths)
   spillscan version
 
 Agents: claude-code, codex, cursor, gemini-cli, opencode
+False positives: list them in ~/.config/spillscan/allow.txt (see 'spillscan scan --help').
 Colors follow the terminal; set NO_COLOR=1 or pass --no-color to disable.
 Exit codes: 0 clean/ok · 2 findings (scan) · 1 error
 `
@@ -99,10 +101,18 @@ func isFlag(a string) bool { return len(a) > 1 && strings.HasPrefix(a, "-") }
 
 func cmdScan(args []string, out, errw io.Writer) int {
 	asJSON, noColor, agent, rest := false, false, "", []string{}
+	var af allowFlags
 	for i := 0; i < len(args); i++ {
 		a := args[i]
 		if v, ok := strings.CutPrefix(a, "--agent="); ok {
 			agent = v
+			continue
+		}
+		if next, handled, code := af.take("scan", args, i, errw); handled {
+			if code != 0 {
+				return code
+			}
+			i = next
 			continue
 		}
 		switch a {
@@ -118,17 +128,19 @@ func cmdScan(args []string, out, errw io.Writer) int {
 			}
 			agent = args[i]
 		case "-h", "--help":
-			fmt.Fprintln(out, "spillscan scan [--json] [--agent NAME] [--no-color] [paths...]")
+			fmt.Fprintln(out, "spillscan scan [--json] [--agent NAME] [--allow FILE] [--no-allow] [--no-color] [paths...]")
 			fmt.Fprintln(out, "  No paths: survey every known agent transcript root under $HOME.")
 			fmt.Fprintf(out, "  --agent: limit discovery to one of %s\n", strings.Join(paths.Agents, ", "))
 			fmt.Fprintln(out, "  Exit 2 when anything is found, so it gates CI and pre-commit hooks.")
+			fmt.Fprintln(out, "")
+			fmt.Fprint(out, allowHelp)
 			return 0
 		case "--":
 			rest = append(rest, args[i+1:]...)
 			i = len(args)
 		default:
 			if isFlag(a) {
-				return badFlag(errw, "scan", a, []string{"--json", "--agent", "--no-color", "--help"})
+				return badFlag(errw, "scan", a, []string{"--json", "--agent", "--allow", "--no-allow", "--no-color", "--help"})
 			}
 			rest = append(rest, a)
 		}
@@ -144,7 +156,11 @@ func cmdScan(args []string, out, errw io.Writer) int {
 		fmt.Fprintln(errw, "spillscan scan: --agent filters discovery; drop it when passing explicit paths")
 		return 1
 	}
-	res, err := scan.Run(scan.Options{Agent: agent, Paths: rest})
+	al, code := af.load("scan", errw)
+	if code != 0 {
+		return code
+	}
+	res, err := scan.Run(scan.Options{Agent: agent, Paths: rest, Allow: al})
 	if err != nil {
 		fmt.Fprintln(errw, "spillscan scan:", err)
 		return 1
@@ -177,6 +193,9 @@ func printScan(out io.Writer, res *scan.Result, p painter, explicit bool) {
 	if n > 0 {
 		head = fmt.Sprintf("files=%d findings=%s distinct=%d", res.Files, p.contam(fmt.Sprint(n)), len(distinct))
 	}
+	if res.Allowlisted > 0 {
+		head += fmt.Sprintf(" allowlisted=%d", res.Allowlisted)
+	}
 	fmt.Fprintf(out, "%s  %s  %s\n", p.amber(p.bold("SPILLSCAN")), head, p.dim(res.ScannedAt.Local().Format("2006-01-02 15:04 MST")))
 	if res.Files == 0 {
 		if explicit {
@@ -189,18 +208,120 @@ func printScan(out io.Writer, res *scan.Result, p painter, explicit bool) {
 	}
 	if n == 0 {
 		fmt.Fprintln(out, p.ok("CLEAN")+fmt.Sprintf(" — %d %s surveyed, no secret-shaped contamination.", res.Files, plural(res.Files, "transcript", "transcripts")))
+		printAllowlisted(out, res, p)
 		return
 	}
 	tw := tabwriter.NewWriter(out, 0, 4, 2, ' ', 0)
-	fmt.Fprintln(tw, p.dim("RULE\tPREVIEW\tAGENT\tFILE:LINE"))
+	fmt.Fprintln(tw, p.dim("RULE\tPREVIEW\tFP\tAGENT\tFILE:LINE"))
 	for _, f := range res.Findings {
-		fmt.Fprintf(tw, "%s\t%s\t%s\t%s:%d\n", p.contam(f.Rule), f.Preview, agentLabel(f.Agent), tildify(f.Path), f.Line)
+		fmt.Fprintf(tw, "%s\t%s\t%s\t%s\t%s:%d\n", p.contam(f.Rule), f.Preview, p.dim(f.Fingerprint), agentLabel(f.Agent), tildify(f.Path), f.Line)
 	}
 	_ = tw.Flush()
 	fmt.Fprintf(out, "\n%s — %d distinct %s in %d %s.\n", p.contam("CONTAMINATED"), len(distinct), plural(len(distinct), "secret", "secrets"), len(files), plural(len(files), "file", "files"))
 	fmt.Fprintln(out, "  1. Rotate them at the provider first — scrubbing a transcript does not revoke a key.")
-	fmt.Fprintln(out, "  2. Preview the scrub:  "+p.amber("spillscan redact"+scopeHint(res, explicit)))
-	fmt.Fprintln(out, "  3. Apply it (.bak kept): "+p.amber("spillscan redact --write"+scopeHint(res, explicit)))
+	fmt.Fprintln(out, "  2. Preview the scrub:  "+p.amber("spillscan redact"+allowArgs(res.AllowFiles)+scopeHint(res, explicit)))
+	fmt.Fprintln(out, "  3. Apply it (.bak kept): "+p.amber("spillscan redact --write"+allowArgs(res.AllowFiles)+scopeHint(res, explicit)))
+	fmt.Fprintln(out, p.dim("  Known-fake value? Add the line fp:<FP> to "+tildify(allowTarget(res))+"; scan and redact then skip it."))
+	printAllowlisted(out, res, p)
+}
+
+// printAllowlisted says how many findings an allowlist hid, and where from.
+func printAllowlisted(out io.Writer, res *scan.Result, p painter) {
+	if res.Allowlisted == 0 {
+		return
+	}
+	src := make([]string, len(res.AllowFiles))
+	for i, f := range res.AllowFiles {
+		src[i] = tildify(f)
+	}
+	fmt.Fprintf(out, "%s\n", p.dim(fmt.Sprintf("  %d allowlisted %s hidden (%s). Show everything: spillscan scan --no-allow",
+		res.Allowlisted, plural(res.Allowlisted, "finding", "findings"), strings.Join(src, ", "))))
+}
+
+// allowArgs repeats non-default --allow files in follow-up commands, so
+// redact skips exactly what scan hid.
+func allowArgs(files []string) string {
+	var b strings.Builder
+	for _, f := range files {
+		if f != allow.DefaultPath() {
+			b.WriteString(" --allow " + shellQuote(tildify(f)))
+		}
+	}
+	return b.String()
+}
+
+// allowTarget is the file the "known-fake value?" hint points at: the first
+// allowlist in use, else the default location.
+func allowTarget(res *scan.Result) string {
+	if len(res.AllowFiles) > 0 {
+		return res.AllowFiles[0]
+	}
+	return allow.DefaultPath()
+}
+
+const allowHelp = `Allowlist (false positives):
+  Read from ~/.config/spillscan/allow.txt ($XDG_CONFIG_HOME/spillscan/allow.txt)
+  when it exists, plus every --allow FILE. --no-allow ignores all of them.
+  Allowlisted findings are left out of scan, redact and the MCP scan_report;
+  scan reports how many were hidden. One entry per line, '#' comments:
+    fp:3f9a1c0b7e21                             one value, from scan's FP column
+    rule:jwt path:~/.claude/projects/*docs*/**  one rule in some transcripts
+    path:~/.codex/sessions/2026/01/**           every rule under a path
+    value:AKIAIOSFODNN7EXAMPLE                  a literal, known-fake value
+  Keys on one line must all match. Globs: * stays inside one path segment,
+  ** crosses segments, ? is one character, ~/ is your home; a glob without /
+  matches the file name. Use fp: for anything that could be real: value:
+  stores the literal in the file, fp: never does.
+`
+
+// allowFlags collects --allow FILE (repeatable) and --no-allow.
+type allowFlags struct {
+	files []string
+	none  bool
+}
+
+// take consumes an allowlist flag at args[i]. It returns the index of the
+// last consumed arg, whether the flag was ours, and a non-zero exit code on
+// a usage error.
+func (a *allowFlags) take(cmd string, args []string, i int, errw io.Writer) (int, bool, int) {
+	arg := args[i]
+	if v, ok := strings.CutPrefix(arg, "--allow="); ok {
+		if v == "" {
+			fmt.Fprintf(errw, "spillscan %s: --allow needs a file\n", cmd)
+			return i, true, 1
+		}
+		a.files = append(a.files, v)
+		return i, true, 0
+	}
+	switch arg {
+	case "--allow", "-allow":
+		if i+1 >= len(args) || isFlag(args[i+1]) {
+			fmt.Fprintf(errw, "spillscan %s: --allow needs a file (default list: %s)\n", cmd, tildify(allow.DefaultPath()))
+			return i, true, 1
+		}
+		a.files = append(a.files, args[i+1])
+		return i + 1, true, 0
+	case "--no-allow", "-no-allow":
+		a.none = true
+		return i, true, 0
+	}
+	return i, false, 0
+}
+
+func (a allowFlags) load(cmd string, errw io.Writer) (*allow.List, int) {
+	if a.none {
+		if len(a.files) > 0 {
+			fmt.Fprintf(errw, "spillscan %s: --no-allow ignores every allowlist; drop --allow or --no-allow\n", cmd)
+			return nil, 1
+		}
+		return nil, 0
+	}
+	l, err := allow.Load(true, a.files)
+	if err != nil {
+		fmt.Fprintf(errw, "spillscan %s: %v\n", cmd, err)
+		return nil, 1
+	}
+	return l, 0
 }
 
 // scopeHint repeats explicit file paths in the follow-up commands (up to 3).
@@ -233,7 +354,16 @@ func shellQuote(s string) string {
 func cmdRedact(args []string, out, errw io.Writer) int {
 	write, asJSON, noColor := false, false, false
 	var rest []string
-	for _, a := range args {
+	var af allowFlags
+	for i := 0; i < len(args); i++ {
+		a := args[i]
+		if next, handled, code := af.take("redact", args, i, errw); handled {
+			if code != 0 {
+				return code
+			}
+			i = next
+			continue
+		}
 		switch a {
 		case "--write", "-write":
 			write = true
@@ -242,18 +372,27 @@ func cmdRedact(args []string, out, errw io.Writer) int {
 		case "--no-color", "-no-color":
 			noColor = true
 		case "-h", "--help":
-			fmt.Fprintln(out, "spillscan redact [--write] [--json] [paths...]")
+			fmt.Fprintln(out, "spillscan redact [--write] [--json] [--allow FILE] [--no-allow] [paths...]")
 			fmt.Fprintln(out, "  Without --write: dry-run, nothing is changed.")
 			fmt.Fprintln(out, "  With --write: copy each file to <file>.bak, then replace secrets with [REDACTED:<rule>].")
 			fmt.Fprintln(out, "  JSONL lines stay valid JSON; tool-results/ spill files are treated as plain text.")
+			fmt.Fprintln(out, "  Allowlisted values (same lists as scan) are left in place.")
 			fmt.Fprintln(out, "  Rotate keys at the provider first.")
 			return 0
 		default:
 			if isFlag(a) {
-				return badFlag(errw, "redact", a, []string{"--write", "--json", "--no-color", "--help"})
+				return badFlag(errw, "redact", a, []string{"--write", "--json", "--allow", "--no-allow", "--no-color", "--help"})
 			}
 			rest = append(rest, a)
 		}
+	}
+	al, code := af.load("redact", errw)
+	if code != 0 {
+		return code
+	}
+	allowFlag := ""
+	if al != nil {
+		allowFlag = allowArgs(al.Files)
 	}
 	p := newPainter(out, noColor)
 	scope := ""
@@ -286,7 +425,7 @@ func cmdRedact(args []string, out, errw io.Writer) int {
 		fmt.Fprintln(errw, "spillscan redact:", err)
 		return 1
 	}
-	res, err := redact.Run(files, redact.Options{Write: write})
+	res, err := redact.Run(files, redact.Options{Write: write, Allow: al})
 	if err != nil {
 		fmt.Fprintln(errw, "spillscan redact:", err)
 		return 1
@@ -301,7 +440,16 @@ func cmdRedact(args []string, out, errw io.Writer) int {
 	if write {
 		mode = p.contam("write")
 	}
-	fmt.Fprintf(out, "%s (%s)  files=%d replaced=%d\n", p.amber(p.bold("REDACT")), mode, res.Files, res.Replaced)
+	allowed := ""
+	if res.Allowlisted > 0 {
+		allowed = fmt.Sprintf(" allowlisted=%d", res.Allowlisted)
+	}
+	fmt.Fprintf(out, "%s (%s)  files=%d replaced=%d%s\n", p.amber(p.bold("REDACT")), mode, res.Files, res.Replaced, allowed)
+	defer func() {
+		if res.Allowlisted > 0 {
+			fmt.Fprintln(out, p.dim(fmt.Sprintf("  %d allowlisted %s left as-is.", res.Allowlisted, plural(res.Allowlisted, "value", "values"))))
+		}
+	}()
 	switch {
 	case res.Files == 0:
 		fmt.Fprintln(out, p.amber("NO READING")+" — no transcripts to scrub.")
@@ -314,7 +462,7 @@ func cmdRedact(args []string, out, errw io.Writer) int {
 		fmt.Fprintf(out, "%s — %d %s replaced with [REDACTED:<rule>]. Verify: %s\n", p.ok("SCRUBBED"), res.Replaced, plural(res.Replaced, "secret", "secrets"), p.amber("spillscan scan"))
 		fmt.Fprintln(out, p.dim("  The .bak files still hold the originals: delete them once you're satisfied, or put them back with 'spillscan undo'."))
 	default:
-		fmt.Fprintf(out, "Would replace %d %s. Nothing changed. Apply with: %s\n", res.Replaced, plural(res.Replaced, "secret", "secrets"), p.amber("spillscan redact --write"+scope))
+		fmt.Fprintf(out, "Would replace %d %s. Nothing changed. Apply with: %s\n", res.Replaced, plural(res.Replaced, "secret", "secrets"), p.amber("spillscan redact --write"+allowFlag+scope))
 	}
 	return 0
 }
@@ -322,7 +470,16 @@ func cmdRedact(args []string, out, errw io.Writer) int {
 func cmdUndo(args []string, out, errw io.Writer) int {
 	write, asJSON, noColor := false, false, false
 	var rest []string
-	for _, a := range args {
+	var af allowFlags
+	for i := 0; i < len(args); i++ {
+		a := args[i]
+		if next, handled, code := af.take("undo", args, i, errw); handled {
+			if code != 0 {
+				return code
+			}
+			i = next
+			continue
+		}
 		switch a {
 		case "--write", "-write":
 			write = true
@@ -331,19 +488,24 @@ func cmdUndo(args []string, out, errw io.Writer) int {
 		case "--no-color", "-no-color":
 			noColor = true
 		case "-h", "--help":
-			fmt.Fprintln(out, "spillscan undo [--write] [--json] [paths...]")
+			fmt.Fprintln(out, "spillscan undo [--write] [--json] [--allow FILE] [--no-allow] [paths...]")
 			fmt.Fprintln(out, "  Put back the originals that 'redact --write' saved as <file>.bak.")
 			fmt.Fprintln(out, "  Without --write: dry-run, nothing is changed.")
 			fmt.Fprintln(out, "  Lines the agent appended after the scrub are kept; a file edited any other")
 			fmt.Fprintln(out, "  way is reported as diverged and left alone. The .bak is removed once restored.")
+			fmt.Fprintln(out, "  Pass the same --allow files you scrubbed with, so allowlisted values match.")
 			fmt.Fprintln(out, "  Exit 1 if any backup could not be restored.")
 			return 0
 		default:
 			if isFlag(a) {
-				return badFlag(errw, "undo", a, []string{"--write", "--json", "--no-color", "--help"})
+				return badFlag(errw, "undo", a, []string{"--write", "--json", "--allow", "--no-allow", "--no-color", "--help"})
 			}
 			rest = append(rest, a)
 		}
+	}
+	al, code := af.load("undo", errw)
+	if code != 0 {
+		return code
 	}
 	scope := ""
 	if len(rest) > 0 {
@@ -377,12 +539,12 @@ func cmdUndo(args []string, out, errw io.Writer) int {
 		fmt.Fprintln(errw, "spillscan undo:", err)
 		return 1
 	}
-	res, err := redact.Undo(baks, redact.Options{Write: write})
+	res, err := redact.Undo(baks, redact.Options{Write: write, Allow: al})
 	if err != nil {
 		fmt.Fprintln(errw, "spillscan undo:", err)
 		return 1
 	}
-	code := 0
+	code = 0
 	if res.Skipped > 0 {
 		code = 1
 	}

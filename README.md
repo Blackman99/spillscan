@@ -37,26 +37,44 @@ sudo mv spillscan /usr/local/bin/ && spillscan version
 ```text
 $ spillscan scan
 SPILLSCAN  files=41 findings=3 distinct=3  2026-10-14 10:04 CST
-RULE        PREVIEW    AGENT        FILE:LINE
-aws-akia    AKIA…MPLE  claude-code  ~/.claude/projects/…/x.jsonl:128
-github-pat  ghp_…a91F  claude-code  ~/.claude/projects/…/x.jsonl:128
-openai-sk   sk-p…9Qx2  codex        ~/.codex/sessions/…/y.jsonl:44
+RULE        PREVIEW    FP            AGENT        FILE:LINE
+aws-akia    AKIA…MPLE  8cc03843ecd0  claude-code  ~/.claude/projects/…/x.jsonl:128
+github-pat  ghp_…a91F  1d6e40b2c9f7  claude-code  ~/.claude/projects/…/x.jsonl:128
+openai-sk   sk-p…9Qx2  a40f3be1d258  codex        ~/.codex/sessions/…/y.jsonl:44
 
 CONTAMINATED — 3 distinct secrets in 2 files.
   1. Rotate them at the provider first — scrubbing a transcript does not revoke a key.
   2. Preview the scrub:  spillscan redact
   3. Apply it (.bak kept): spillscan redact --write
+  Known-fake value? Add the line fp:<FP> to ~/.config/spillscan/allow.txt; scan and redact then skip it.
 ```
+
+`FP` is a short fingerprint of the value (never the value itself), used by the allowlist below.
 
 | Command | What it does |
 |---|---|
-| `spillscan scan [--agent NAME] [paths…]` | Survey. Exit `0` clean · `2` findings · `1` error. `--json` for scripts. |
-| `spillscan redact [--write] [paths…]` | Dry-run by default; `--write` backs up to `.bak`, then replaces with `[REDACTED:<rule>]`. JSONL stays valid JSON; `tool-results/` spill files are scrubbed as plain text. Scrubbing again later extends the existing `.bak` with the new lines instead of overwriting the first originals. |
-| `spillscan undo [--write] [paths…]` | Put the `.bak` originals back. Dry-run by default. Lines the agent appended after the scrub are kept; a file edited any other way is reported `diverged` and left alone. Exit `1` if any backup could not be restored. *(on `main`, ships in the next release)* |
+| `spillscan scan [--agent NAME] [--allow FILE] [--no-allow] [paths…]` | Survey. Exit `0` clean · `2` findings · `1` error. `--json` for scripts. Allowlisted findings are hidden, counted in the header (`allowlisted=N`) and don't affect the exit code. |
+| `spillscan redact [--write] [paths…]` | Dry-run by default; `--write` backs up to `.bak`, then replaces with `[REDACTED:<rule>]`. JSONL stays valid JSON; `tool-results/` spill files are scrubbed as plain text. Scrubbing again later extends the existing `.bak` with the new lines instead of overwriting the first originals. Allowlisted values are left as they are. |
+| `spillscan undo [--write] [paths…]` | Put the `.bak` originals back. Dry-run by default. Lines the agent appended after the scrub are kept; a file edited any other way is reported `diverged` and left alone. Exit `1` if any backup could not be restored. Pass the same `--allow` files you scrubbed with. |
 | `spillscan paths` | Which transcript roots were discovered, and how many files each holds. |
 | `spillscan guard` / `spillscan mcp` | Claude Code hook (below) / read-only MCP server (`scan_report`, `list_paths`). |
 
 Agents: `claude-code`, `codex`, `cursor`, `gemini-cli`, `opencode`. Paths are shown as `~/…` so screenshots don't leak your username. Output is colored only on a terminal; `NO_COLOR=1` or `--no-color` turns it off.
+
+### Allowlist known fakes *(on `main`, ships in the next release)*
+
+Docs example keys, test fixtures and tutorial JWTs are real-looking but harmless. List them once in `~/.config/spillscan/allow.txt` (or `$XDG_CONFIG_HOME/spillscan/allow.txt`) and `scan`, `redact` and the MCP `scan_report` skip them. Add more lists with `--allow FILE` (repeatable); `--no-allow` ignores them all.
+
+```text
+# one entry per line; keys on one line must all match
+fp:8cc03843ecd0                             # one value, by the FP scan printed
+rule:jwt path:~/.claude/projects/*docs*/**  # a rule, only under some transcripts
+path:~/.codex/sessions/2026/01/**           # everything under a path
+rule:generic-assign                         # a whole detector
+value:AKIAIOSFODNN7EXAMPLE                  # a literal (only for values that are fake by design)
+```
+
+`fp:` takes 8–64 hex characters of the fingerprint (a domain-separated SHA-256 of the value), so you never have to write a real value down. `path:` globs match the absolute transcript path: `*` stays in one segment, `**` crosses them, `~/` is your home, and a glob without `/` matches the file name. A typo is an error with the file and line (`allow.txt:3: unknown rule "jtw" (did you mean rule:jwt?)`), not a silent miss. Nothing is hidden quietly: scan reports the count and how to see everything.
 
 ### Guard (Claude Code PreToolUse)
 

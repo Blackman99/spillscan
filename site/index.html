@@ -77,11 +77,12 @@
   "hooks": [{ "type": "command", "command": "spillscan guard" }] }] } }</pre></div></li>
     <li><span class="n">2</span><div><h3>Survey</h3><p>Walk every transcript under <code>~/.claude/projects</code>, <code>~/.codex/sessions</code> and Cursor. Patterns plus entropy, so unknown tokens show up too.</p>
 <pre class="cmd">$ spillscan scan
-RULE        PREVIEW    AGENT        FILE:LINE
-<b>aws-akia</b>    AKIA…MPLE  claude-code  ~/.claude/projects/…/x.jsonl:128
-<b>github-pat</b>  ghp_…ABCD  claude-code  ~/.claude/projects/…/x.jsonl:128
-<b>openai-sk</b>   sk-p…demo  codex        ~/.codex/sessions/…/y.jsonl:44
-CONTAMINATED — 3 distinct secrets in 2 files.</pre></div></li>
+RULE        PREVIEW    FP            AGENT        FILE:LINE
+<b>aws-akia</b>    AKIA…MPLE  8cc03843ecd0  claude-code  ~/.claude/projects/…/x.jsonl:128
+<b>github-pat</b>  ghp_…ABCD  cbac6b3a48c4  claude-code  ~/.claude/projects/…/x.jsonl:128
+<b>openai-sk</b>   sk-p…demo  8a11fd79fd89  codex        ~/.codex/sessions/…/y.jsonl:44
+CONTAMINATED — 3 distinct secrets in 2 files.</pre>
+<p class="undo-note">A fixture key from the docs? Copy its <code>FP</code> into your <a href="docs/configuration.html#allowlist">allowlist</a> and the next survey leaves it out. The header still says <code>allowlisted=1</code>, so nothing goes quiet without a trace.</p></div></li>
     <li><span class="n">3</span><div><h3>Rotate</h3><p>Revoke the keys at the provider first. Scrubbing a log does not un-leak a credential that already left your machine.</p></div></li>
     <li><span class="n">4</span><div><h3>Absorb</h3><p>Preview with <code>spillscan redact</code>, then apply. JSONL stays valid, each file keeps a <code>.bak</code>.</p>
 <pre class="cmd">$ spillscan redact --write
@@ -101,8 +102,12 @@ REDACT (write)  files=2 replaced=3
 curl -fsSL "https://github.com/Blackman99/spillscan/releases/download/v$V/spillscan_${V}_${OS}_${ARCH}.tar.gz" | tar xz spillscan
 sudo mv spillscan /usr/local/bin/ &amp;&amp; spillscan version</pre><button class="copy" type="button" data-copy="inst-bin" aria-label="Copy binary install command">Copy</button></div></dd>
     <dt>Reads</dt><dd>Claude Code, Codex and Cursor transcripts. Local and offline. Nothing is uploaded.</dd>
+    <dt>Known fakes</dt><dd>Tag them once and spillscan leaves them alone in scan, redact and the MCP report. A fingerprint is enough, so the value itself never has to be written down.
+<pre class="cmd"># ~/.config/spillscan/allow.txt
+fp:8cc03843ecd0                         # AWS docs example key
+rule:jwt path:~/.claude/projects/*docs*/**</pre></dd>
     <dt>Not a firewall</dt><dd>gitleaks scans directories but doesn't understand transcripts; Stroq matches values you already know and won't touch past records. spillscan is the cleanup for leaks that already happened. Origin: <a href="https://github.com/anthropics/claude-code/issues/80153">claude-code#80153</a>.</dd>
-    <dt>More</dt><dd><a href="docs/">Docs</a> · <a href="docs/install.html">Install guide</a> · <a href="https://github.com/Blackman99/spillscan/releases">Releases</a> · <a href="blog/transcript-spills.html">Why transcripts spill</a> · <a href="blog/transcript-spills.zh.html">中文</a></dd>
+    <dt>More</dt><dd><a href="docs/">Docs</a> · <a href="docs/install.html">Install guide</a> · <a href="https://github.com/Blackman99/spillscan/releases">Releases</a> · <a href="blog/transcript-spills.html">Why transcripts spill</a> · <a href="blog/transcript-spills.zh.html">中文</a> · <a href="blog/known-fakes-allowlist.html">Allowlisting known fakes</a> · <a href="blog/known-fakes-allowlist.zh.html">中文</a></dd>
   </dl>
 </section>
 </main>

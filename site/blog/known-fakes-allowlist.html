@@ -1,0 +1,53 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Tag the known fakes once, keep the alarm honest</title>
+<meta name="description" content="spillscan now reads an allowlist of known-fake values, keyed by a fingerprint so the value never has to be written down.">
+<meta property="og:title" content="Tag the known fakes once, keep the alarm honest">
+<meta property="og:image" content="https://blackman99.github.io/spillscan/og.png">
+<meta name="twitter:card" content="summary_large_image">
+<link rel="stylesheet" href="../style.css">
+<link rel="icon" href="../favicon.svg" type="image/svg+xml">
+</head>
+<body class="panel-texture">
+<div class="stripe"></div>
+<nav class="top"><a href="../">HOME</a><a href="../docs/">DOCS</a><a href="./">BLOG</a></nav>
+<div class="stack" style="padding-top:3rem">
+<article class="inst">
+<h2>Tag the known fakes once, keep the alarm honest</h2>
+<p>If you ever asked an agent to write an AWS example, your transcripts hold <code>AKIAIOSFODNN7EXAMPLE</code>. It is the key from Amazon's own docs, it matches the AWS pattern perfectly, and spillscan reported it on every run. So did the fixture token in your test suite and the JWT from a tutorial you pasted. After the third time you see the same harmless line, you start reading the report less carefully. An alarm that cries wolf trains you to ignore it.</p>
+<p>spillscan now reads an allowlist. The interesting part is what you put in it.</p>
+
+<h3>A fingerprint, not the value</h3>
+<p>Every finding now has an <code>FP</code> column: the first 12 hex characters of a SHA-256 over the value, with a spillscan-specific prefix mixed in. It identifies the value without containing it.</p>
+<pre class="cmd">$ spillscan scan
+RULE        PREVIEW    FP            AGENT        FILE:LINE
+aws-akia    AKIA…MPLE  8cc03843ecd0  claude-code  ~/.claude/projects/…/x.jsonl:128
+github-pat  ghp_…a91F  1d6e40b2c9f7  claude-code  ~/.claude/projects/…/x.jsonl:128
+...
+  Known-fake value? Add the line fp:&lt;FP&gt; to ~/.config/spillscan/allow.txt; scan and redact then skip it.</pre>
+<p>Copy the one you recognise into <code>~/.config/spillscan/allow.txt</code>:</p>
+<pre class="cmd">fp:8cc03843ecd0   # AWS docs example key</pre>
+<p>Why not just let people list the value? Because the allowlist is exactly the file you will commit to dotfiles, share with a teammate, or paste into an issue. If it held values, the first time someone allowlisted a key they <em>believed</em> was fake, the list would become a new place where a real secret leaks. With a fingerprint, the worst case is a 12-character hash. A <code>value:</code> key exists for literals that are fake by design, and the docs say plainly that it stores what you type.</p>
+
+<h3>Rules and places, too</h3>
+<p>Sometimes the noise is a whole class: every JWT in the sessions where you worked on an auth tutorial, say. Keys on one line must all match; separate lines are alternatives.</p>
+<pre class="cmd">rule:jwt path:~/.claude/projects/*auth-tutorial*/**
+path:~/.codex/sessions/2026/01/**
+rule:generic-assign</pre>
+<p>Globs work on the absolute transcript path: <code>*</code> stays in one directory, <code>**</code> crosses them, <code>~/</code> is home, and a glob with no slash matches just the file name. A typo such as <code>rule:jtw</code> stops the run with <code>allow.txt:1: unknown rule "jtw" (did you mean rule:jwt?)</code>. An allowlist that silently matches nothing is worse than none.</p>
+
+<h3>Nothing goes quiet without a trace</h3>
+<p>Hiding findings is the risky half of this feature, so spillscan is loud about it. The header says <code>allowlisted=1</code>, a closing line names the list that did it, and <code>spillscan scan --no-allow</code> shows the raw reading. Allowlisted findings never cause exit 2, so a CI check can go green, but <code>--json</code> still reports the count. <code>redact</code> leaves the same values exactly as they were and says how many. The MCP <code>scan_report</code> follows your default list, and it is still read-only.</p>
+<p>Extra lists come in with <code>--allow FILE</code>, repeatable. The follow-up commands scan prints repeat them, so the scrub you copy skips exactly what the survey hid.</p>
+
+<h3>One bug the tests caught</h3>
+<p>A PEM private key spans several lines. In the JSONL file those line breaks are stored as <code>\n</code> escapes; once the JSON is decoded they are real newlines. Scan fingerprints the raw bytes and redact walks the decoded JSON, so the same key got two different fingerprints, and an allowlisted PEM block would have been scrubbed anyway. Redact now checks both forms. There is a test that fails if that check is removed.</p>
+<p>This is on <code>main</code> and ships in the next release. Format details are in <a href="../docs/configuration.html#allowlist">Configuration</a>; <a href="https://github.com/Blackman99/spillscan">source and README</a>. And a known fake is the only thing to allowlist. A real key that leaked still needs rotating.</p>
+<p>— 2026-10-28</p>
+</article>
+</div>
+</body>
+</html>

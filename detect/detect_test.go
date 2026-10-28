@@ -59,3 +59,23 @@ func TestPreview(t *testing.T) {
 		t.Fatalf("got %q", p)
 	}
 }
+
+func TestFingerprint(t *testing.T) {
+	const fake = "AKIAIOSFODNN7EXAMPLE"
+	fp := Fingerprint(fake)
+	if len(fp) != 12 || strings.Trim(fp, "0123456789abcdef") != "" {
+		t.Fatalf("fp=%q want 12 lowercase hex", fp)
+	}
+	if Fingerprint(fake) != fp {
+		t.Fatal("fingerprint must be stable")
+	}
+	if Fingerprint(fake+"X") == fp {
+		t.Fatal("different values must differ")
+	}
+	if strings.Contains(fp, "AKIA") {
+		t.Fatal("fingerprint leaks the value")
+	}
+	if len(RuleIDs()) == 0 || RuleIDs()[0] != "aws-akia" {
+		t.Fatalf("RuleIDs=%v", RuleIDs())
+	}
+}
